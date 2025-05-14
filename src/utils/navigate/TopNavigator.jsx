@@ -124,11 +124,11 @@ const TopNavigator = () => {
                             </Link>
 
                             <Link
-                                to="/login"
+                                to="/signin"
                                 className={`px-3 h-full flex items-center relative`}
                             >
                                 <CustomText
-                                    font={isActive("/login") ? "pretendard-700" : "pretendard-500"}
+                                    font={isActive("/signin") ? "pretendard-700" : "pretendard-500"}
                                     className="text-sm"
                                     style={{ color: colors.primary }}
                                 >
