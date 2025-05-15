@@ -22,7 +22,7 @@ export const sampleClubs = [
     id: 3,
     icon: econoLogo,
     name: '에코노베이션',
-    department: '학술분과',
+    department: '봉사분과',
     category: 'IT',
     isRecruiting: true
   },
@@ -30,7 +30,15 @@ export const sampleClubs = [
     id: 4,
     icon: cheongbulLogo,
     name: '청불',
-    department: '문예분과',
+    department: '종교분과',
+    category: '영상',
+    isRecruiting: false
+  },
+  {
+    id: 5,
+    icon: cheongbulLogo,
+    name: '청불',
+    department: '체육분과',
     category: '영상',
     isRecruiting: false
   }
