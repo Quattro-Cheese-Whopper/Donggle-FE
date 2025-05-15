@@ -13,7 +13,7 @@ const TopNavigator = () => {
     };
 
     return (
-        <nav className="w-full bg-white shadow-xl">
+        <nav className="w-full bg-white shadow-md">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between h-16">
                     {/* 로고 및 메인 네비게이션 */}
@@ -66,18 +66,18 @@ const TopNavigator = () => {
                             </Link>
 
                             <Link
-                                to="/central"
+                                to="/club/central"
                                 className={`px-3 h-full flex items-center relative`}
                             >
                                 <CustomText
-                                    font={isActive("/central") ? "pretendard-700" : "pretendard-500"}
+                                    font={isActive("/club/central") ? "pretendard-700" : "pretendard-500"}
                                     className="text-sm"
-                                    style={{ color: isActive("/central") ? colors.primary : colors.darkGray }}
+                                    style={{ color: isActive("/club/central") ? colors.primary : colors.darkGray }}
                                 >
                                     중앙 동아리
                                 </CustomText>
 
-                                {isActive("/central") && (
+                                {isActive("/club/central") && (
                                     <div
                                         style={{
                                             position: "absolute",

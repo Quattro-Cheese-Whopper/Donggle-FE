@@ -1,30 +1,20 @@
 import React from 'react';
 import TopNavigator from '../../utils/navigate/TopNavigator';
 import Footer from '../../utils/footer/BottomFooter'
-import JnuImage from '../../assets/전남대 풍경.png';
-import { HorizontalClubCarousel } from '../../components/cards/ClubCard';
+import { ClubCardGrid } from '../../components/cards/ClubCard';
 import sampleClubs from '../../constants/clubs';
 
-const Home = () => {
+const CentralClub = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-white-50">
       <div className="relative z-10">
         <TopNavigator />
-      </div>
-      <div className="w-full" style={{ marginTop: '-4px' }}>
-        <img 
-          src={JnuImage} 
-          className="w-full object-cover"
-          style={{ 
-            height: '300px' // 비율 유지
-          }}
-        />
       </div>
       {/* 메인 컨텐츠 */}
       <main className="flex-grow flex justify-center">
         <div className="max-w-7xl w-full py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            <HorizontalClubCarousel clubs={sampleClubs} />
+            <ClubCardGrid clubs={sampleClubs} />
           </div>
         </div>
       </main>
@@ -33,4 +23,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default CentralClub;
