@@ -1,7 +1,7 @@
 import econoLogo from '../assets/에코노 로고.png';
 import cheongbulLogo from '../assets/청불 로고.png';
 
-export const sampleClubs = [
+export const sampleCentralClubs = [
   {
     id: 1,
     icon: econoLogo,
@@ -44,4 +44,4 @@ export const sampleClubs = [
   }
 ];
 
-export default sampleClubs;
+export default sampleCentralClubs;

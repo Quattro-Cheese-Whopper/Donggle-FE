@@ -7,7 +7,7 @@ import sampleCentralClubs from '../../constants/clubs';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 
-const CentralClub = () => {
+const DepartmentClub = () => {
   // 모든 분야 목록 추출 (중복 제거)
   const allCategories = ['전체', ...new Set(sampleCentralClubs.map(club => club.department))];
   
@@ -46,7 +46,7 @@ const CentralClub = () => {
                 className="text-lg mb-4"
                 style={{ color: colors.black }}
             >
-                중앙 동아리 목록
+                학과 동아리 목록
             </CustomText>
             {/* 필터링된 동아리 목록 */}
             <ClubCardGrid clubs={filteredClubs} />
@@ -58,4 +58,4 @@ const CentralClub = () => {
   );
 };
 
-export default CentralClub;
+export default DepartmentClub;
