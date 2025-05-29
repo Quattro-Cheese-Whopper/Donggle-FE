@@ -26,6 +26,10 @@ const CentralClubDetail = () => {
     setLoading(false);
   }, [clubId]);
 
+  // 뒤로 가기 핸들러 추가
+  const handleGoBack = () => {
+    navigate(-1);
+  };
 
   if (loading) {
     return (
@@ -140,15 +144,19 @@ const CentralClubDetail = () => {
       <main className="flex-grow flex justify-center">
         <div className="max-w-screen-lg w-full pb-24 sm:px-6 lg:px-8">
           <div className="px-4">
-            <ClubTabs/>
-            <CustomText 
-                  font="pretendard-600"
-                  className="text-2xl mt-12"
-                  style={{ color: colors.black }}
-                >
-                  동아리 정보
-                </CustomText>
-                <ClubInfoBoard club={club}/>
+            <ClubTabs clubId={clubId} />
+            <div className="mt-8">
+              <CustomText 
+                font="pretendard-700"
+                className="text-xl mb-4"
+                style={{ color: colors.black }}
+              >
+                동아리 정보
+              </CustomText>
+              {/* 2열 구조의 ClubInfoBoard 적용 */}
+              <ClubInfoBoard club={club} style="central" />
+            </div>
+
           </div>
         </div>
       </main>
