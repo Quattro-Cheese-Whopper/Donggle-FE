@@ -8,7 +8,11 @@ export const sampleCentralClubs = [
     name: '에코노베이션',
     department: '학술분과',
     category: 'IT',
-    isRecruiting: true
+    isRecruiting: true,
+    memberCount: '40+',
+    mainActivity: '프로젝트 개발',
+    clubRoom : '정보전산원 3층',
+    website : 'https://econovation.kr/'
   },
   {
     id: 2,
@@ -16,7 +20,11 @@ export const sampleCentralClubs = [
     name: '청불',
     department: '문예분과',
     category: '영상',
-    isRecruiting: false
+    isRecruiting: false,
+    memberCount: '50+',
+    mainActivity: '영화 촬영',
+    clubRoom : '1학생회관 204호',
+    website : 'https://econovation.kr/'
   },
   {
     id: 3,

@@ -153,8 +153,7 @@ const CentralClubDetail = () => {
               >
                 동아리 정보
               </CustomText>
-              {/* 2열 구조의 ClubInfoBoard 적용 */}
-              <ClubInfoBoard club={club} style="central" />
+              <ClubInfoBoard club={club} style="introduce" />
             </div>
 
           </div>
