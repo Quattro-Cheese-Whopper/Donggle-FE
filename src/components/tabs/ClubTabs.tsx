@@ -1,28 +1,22 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
 import colors from '../../constants/colors';
 import CustomText from '../../utils/CustomText';
 
-const ClubTabs = ({ clubId }) => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const currentPath = location.pathname;
-  
-  const isIntroActive = !currentPath.includes('/recruit');
+const ClubTabs = ({ activeTab, onTabChange }) => {
+  const isIntroActive = activeTab === 'intro';
   
   const handleRecruitClick = () => {
-    navigate(`/club/central/${clubId}/recruit`);
+    onTabChange('recruit');
   };
 
   const handleIntroClick = () => {
-    navigate(`/club/central/${clubId}`);
+    onTabChange('intro');
   };
 
   return (
     <div className="w-full border-b border-gray-200">
       <div className="max-w-7xl mx-auto">
         <div className="flex">
-          {/* 동아리 소개 탭 */}
           <div 
             className={`w-1/2 text-center py-4 cursor-pointer ${isIntroActive ? 'border-b-2' : ''}`} 
             style={{ 
@@ -42,7 +36,6 @@ const ClubTabs = ({ clubId }) => {
             </CustomText>
           </div>
           
-          {/* 신입 모집 탭 */}
           <div 
             className={`w-1/2 text-center py-4 cursor-pointer ${!isIntroActive ? 'border-b-2' : ''}`}
             style={{ 

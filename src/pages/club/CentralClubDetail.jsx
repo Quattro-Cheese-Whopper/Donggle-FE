@@ -13,6 +13,11 @@ const CentralClubDetail = () => {
   const navigate = useNavigate();
   const [club, setClub] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('intro')
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+  }
 
   useEffect(() => {
     const id = parseInt(clubId);
@@ -26,7 +31,6 @@ const CentralClubDetail = () => {
     setLoading(false);
   }, [clubId]);
 
-  // 뒤로 가기 핸들러 추가
   const handleGoBack = () => {
     navigate(-1);
   };
@@ -144,16 +148,19 @@ const CentralClubDetail = () => {
       <main className="flex-grow flex justify-center">
         <div className="max-w-screen-lg w-full pb-24 sm:px-6 lg:px-8">
           <div className="px-4">
-            <ClubTabs clubId={clubId} />
+            <ClubTabs 
+              activeTab={activeTab}
+              onTabChange={handleTabChange}/>
             <div className="mt-8">
               <CustomText 
                 font="pretendard-700"
                 className="text-xl mb-4"
                 style={{ color: colors.black }}
               >
-                동아리 정보
+                {activeTab === 'intro' ? '동아리 정보' : '모집 요강'}
               </CustomText>
-              <ClubInfoBoard club={club} style="introduce" />
+              <ClubInfoBoard club={club} 
+                style={activeTab === 'intro' ? 'introduce' : 'recruit'} />
             </div>
 
           </div>
