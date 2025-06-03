@@ -1,10 +1,22 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 
-const ClubCard = ({ icon, name, department, category, isRecruiting }) => {
+const ClubCard = ({ id, icon, name, department, category, isRecruiting }) => {
+  const navigate = useNavigate();
+
+  // 카드 클릭 핸들러
+  const handleCardClick = () => {
+    navigate(`/club/central/${id}`);
+  };
+
   return (
-    <div className="bg-white rounded-lg shadow-sm p-5 flex flex-col h-40 relative border border-gray-100">
+    <div 
+      className="bg-white rounded-lg shadow-sm p-5 flex flex-col h-40 relative border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+      onClick={handleCardClick}
+    >
       {/* 동아리 아이콘 */}
       <div className="mb-2">
         <img src={icon} alt={`${name} 아이콘`} className="w-8 h-8" />
@@ -40,23 +52,23 @@ const ClubCard = ({ icon, name, department, category, isRecruiting }) => {
       {/* 모집 상태 배지 */}
       <div className="absolute bottom-4 right-4">
         <div 
-            className="px-3 py-1 rounded-full inline-block"
-            style={{ 
+          className="px-3 py-1 rounded-lg inline-block"
+          style={{ 
             backgroundColor: isRecruiting ? colors.primary : colors.lightGray,
-            }}
+          }}
         >
-            <CustomText 
+          <CustomText 
             font="pretendard-400"
             className="text-xs"
             style={{ 
-                color: isRecruiting ? colors.white : colors.mediumGray,
-                margin: 0,
+              color: isRecruiting ? colors.white : colors.mediumGray,
+              margin: 0,
             }}
-            >
+          >
             {isRecruiting ? '모집중' : '모집종료'}
-            </CustomText>
+          </CustomText>
         </div>
-        </div>
+      </div>
     </div>
   );
 };
@@ -67,6 +79,7 @@ const ClubCardGrid = ({ clubs }) => {
       {clubs.map((club) => (
         <ClubCard
           key={club.id}
+          id={club.id}
           icon={club.icon}
           name={club.name}
           department={club.department}
@@ -125,6 +138,7 @@ const HorizontalClubCarousel = ({ clubs }) => {
         {visibleClubs.map((club) => (
           <div key={club.id} className="flex-1 min-w-0">
             <ClubCard
+              id={club.id}
               icon={club.icon}
               name={club.name}
               department={club.department}
@@ -153,6 +167,9 @@ const HorizontalClubCarousel = ({ clubs }) => {
     </div>
   );
 };
+
+// useState import 추가
+
 
 // 컴포넌트 내보내기
 export { ClubCard, ClubCardGrid, HorizontalClubCarousel };

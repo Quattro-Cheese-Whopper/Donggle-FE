@@ -95,18 +95,18 @@ const TopNavigator = () => {
                             </Link>
 
                             <Link
-                                to="/department"
+                                to="/club/department"
                                 className={`px-3 h-full flex items-center relative`}
                             >
                                 <CustomText
-                                    font={isActive("/department") ? "pretendard-700" : "pretendard-500"}
+                                    font={isActive("/club/department") ? "pretendard-700" : "pretendard-500"}
                                     className="text-sm"
-                                    style={{ color: isActive("/department") ? colors.primary : colors.darkGray }}
+                                    style={{ color: isActive("/club/department") ? colors.primary : colors.darkGray }}
                                 >
                                     학과 동아리
                                 </CustomText>
 
-                                {isActive("/department") && (
+                                {isActive("/club/department") && (
                                     <div
                                         style={{
                                             position: "absolute",

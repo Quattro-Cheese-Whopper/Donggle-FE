@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import CustomText from "../../utils/CustomText";
 import BottomFooter from "../../utils/footer/BottomFooter";
 import colors from "../../constants/colors";
 import eyeClose from "../../assets/icons/eye-close.svg";
 import eyeOpen from "../../assets/icons/eye-open.svg";
+import { useAuth } from "../../hooks/useAuth"; // 추가된 부분
 
 const SignIn = () => {
     const [email, setEmail] = useState("");
@@ -12,6 +13,9 @@ const SignIn = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [errorMessage, setErrorMessage] = useState("");
     const [isFormValid, setIsFormValid] = useState(false);
+
+    const { login, isLoading } = useAuth(); // 추가된 부분
+    const navigate = useNavigate(); // 추가된 부분
 
     // 모든 필드가 채워졌는지 확인하고 isFormValid 상태 업데이트
     useEffect(() => {
@@ -34,7 +38,7 @@ const SignIn = () => {
         setShowPassword(!showPassword);
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => { // async 추가
         e.preventDefault();
 
         // 유효성 검사 (예시)
@@ -43,9 +47,35 @@ const SignIn = () => {
             return;
         }
 
-        // 로그인 로직 구현 (실제로는 API 호출 등이 필요)
-        console.log("로그인 시도:", email, password);
-        // 여기에 로그인 API 호출 및 처리 로직 추가
+        // 🔧 JWT 로그인 로직 추가
+        try {
+            await login({ email, password });
+            navigate('/home'); // 로그인 성공 시 홈으로 이동
+        } catch (error) {
+            // 에러 메시지에서 서버 응답 추출
+            let errorMessage = "로그인에 실패했습니다. 다시 시도해주세요.";
+            
+            if (error.message.includes('401')) {
+                errorMessage = "이메일 또는 비밀번호가 올바르지 않습니다.";
+            } else if (error.message.includes('400')) {
+                // 400 에러의 경우 서버에서 보낸 메시지 사용
+                const bodyMatch = error.message.match(/body: (.+)$/);
+                if (bodyMatch && bodyMatch[1] && bodyMatch[1] !== 'No body') {
+                    try {
+                        const errorData = JSON.parse(bodyMatch[1]);
+                        errorMessage = errorData.message || errorData.error || "이메일과 비밀번호를 확인해주세요.";
+                    } catch (e) {
+                        errorMessage = bodyMatch[1];
+                    }
+                } else {
+                    errorMessage = "이메일과 비밀번호를 확인해주세요.";
+                }
+            } else if (error.message.includes('500')) {
+                errorMessage = "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+            }
+            
+            setErrorMessage(errorMessage);
+        }
     };
 
     return (
@@ -85,6 +115,7 @@ const SignIn = () => {
                                     onChange={handleEmailChange}
                                     placeholder="전남대학교 이메일을 입력해주세요"
                                     className="appearance-none relative block w-full px-3.5 py-3.5 border border-gray-200 placeholder-gray-200 text-gray-600 rounded-xl focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                    disabled={isLoading} // 추가된 부분
                                 />
                             </div>
 
@@ -108,11 +139,13 @@ const SignIn = () => {
                                         onChange={handlePasswordChange}
                                         placeholder="비밀번호를 입력해주세요"
                                         className="appearance-none relative block w-full px-3.5 py-3.5 border border-gray-200 placeholder-gray-200 text-gray-600 rounded-xl focus:outline-none focus:ring-green-500 focus:border-green-500"
+                                        disabled={isLoading} // 추가된 부분
                                     />
                                     <button
                                         type="button"
                                         onClick={togglePasswordVisibility}
                                         className="absolute inset-y-0 right-0 pr-5 flex items-center"
+                                        disabled={isLoading} // 추가된 부분
                                     >
                                         <img className="h-6 w-6" 
                                             src={showPassword ? eyeClose : eyeOpen}
@@ -139,19 +172,20 @@ const SignIn = () => {
                         <div>
                             <button
                                 type="submit"
+                                disabled={!isFormValid || isLoading} // 수정된 부분
                                 className={`group relative w-full flex justify-center py-3.5 px-3.5 border border-transparent rounded-xl focus:outline-none transition-colors duration-300`}
                                 style={{ 
-                                    backgroundColor: isFormValid ? colors.secondary : colors.lightGray
+                                    backgroundColor: (isFormValid && !isLoading) ? colors.secondary : colors.lightGray // 수정된 부분
                                 }}
                             >
                                 <CustomText
                                     font="pretendard-700"
                                     className="text-xl"
                                     style={{ 
-                                        color: isFormValid ? colors.white : colors.darkGray 
+                                        color: (isFormValid && !isLoading) ? colors.white : colors.darkGray // 수정된 부분
                                     }}
                                 >
-                                    로그인
+                                    {isLoading ? '로그인 중...' : '로그인'} {/* 수정된 부분 */}
                                 </CustomText>
                             </button>
                             <div className="text-center mt-8">
