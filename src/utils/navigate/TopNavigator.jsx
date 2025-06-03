@@ -3,13 +3,26 @@ import { Link, useLocation } from "react-router-dom";
 import CustomText from "../CustomText";
 import Logo from "../../assets/전남대 로고.svg";
 import colors from "../../constants/colors";
+import { useAuth } from "../../hooks/useAuth"; // 추가
 
 const TopNavigator = () => {
     const location = useLocation();
+    const { isLoggedIn, logout } = useAuth(); // 추가
 
     // 현재 경로와 비교하여 활성 메뉴 확인
     const isActive = (path) => {
         return location.pathname === path;
+    };
+
+    // 로그아웃 핸들러
+    const handleLogout = async () => {
+        try {
+            await logout();
+            // 로그아웃 후 홈으로 이동
+            window.location.href = '/home';
+        } catch (error) {
+            console.error('로그아웃 실패:', error);
+        }
     };
 
     return (
@@ -123,18 +136,38 @@ const TopNavigator = () => {
                                 )}
                             </Link>
 
-                            <Link
-                                to="/signin"
-                                className={`px-3 h-full flex items-center relative`}
-                            >
-                                <CustomText
-                                    font={isActive("/signin") ? "pretendard-700" : "pretendard-500"}
-                                    className="text-sm"
-                                    style={{ color: colors.primary }}
+                            {/* 🔧 로그인 상태에 따른 메뉴 변경 */}
+                            {isLoggedIn ? (
+                                // 로그인된 경우: 프로필 드롭다운 또는 로그아웃 버튼
+                                <div className="relative">
+                                    <button
+                                        onClick={handleLogout}
+                                        className="px-3 h-full flex items-center relative"
+                                    >
+                                        <CustomText
+                                            font="pretendard-500"
+                                            className="text-sm"
+                                            style={{ color: colors.primary }}
+                                        >
+                                            로그아웃
+                                        </CustomText>
+                                    </button>
+                                </div>
+                            ) : (
+                                // 로그인되지 않은 경우: 로그인 링크
+                                <Link
+                                    to="/signin"
+                                    className={`px-3 h-full flex items-center relative`}
                                 >
-                                    로그인
-                                </CustomText>
-                            </Link>
+                                    <CustomText
+                                        font={isActive("/signin") ? "pretendard-700" : "pretendard-500"}
+                                        className="text-sm"
+                                        style={{ color: colors.primary }}
+                                    >
+                                        로그인
+                                    </CustomText>
+                                </Link>
+                            )}
                         </div>
                     </div>
                 </div>
