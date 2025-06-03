@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 
-const ClubCard = ({ id, icon, name, department, category, isRecruiting }) => {
+const ClubCard = ({ id, icon, name, description, category, isRecruiting }) => {
   const navigate = useNavigate();
 
   // 카드 클릭 핸들러
@@ -38,14 +38,14 @@ const ClubCard = ({ id, icon, name, department, category, isRecruiting }) => {
           style={{ color: colors.darkGray }}
           className="block"
         >
-          {department}
+          {category}
         </CustomText>
         <CustomText 
           font="pretendard-400" 
           style={{ color: colors.darkGray }}
           className="block"
         >
-          {category}
+          {description}
         </CustomText>
       </div>
       
@@ -82,7 +82,7 @@ const ClubCardGrid = ({ clubs }) => {
           id={club.id}
           icon={club.icon}
           name={club.name}
-          department={club.department}
+          description={club.description}
           category={club.category}
           isRecruiting={club.isRecruiting}
         />

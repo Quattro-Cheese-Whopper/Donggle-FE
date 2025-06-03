@@ -1,45 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import TopNavigator from '../../utils/navigate/TopNavigator';
 import Footer from '../../utils/footer/BottomFooter';
 import { ClubCardGrid } from '../../components/cards/ClubCard';
 import CardFilter from '../../components/cards/CardFilter';
-import sampleCentralClubs from '../../constants/clubs';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
+import { useClubs } from '../../hooks/useClubs';
 
 const DepartmentClub = () => {
-  // 모든 분야 목록 추출 (중복 제거)
-  const allCategories = ['전체', ...new Set(sampleCentralClubs.map(club => club.department))];
-  
-  // 선택된 분야 상태
   const [selectedCategory, setSelectedCategory] = useState('전체');
-  
-  // 필터링된 동아리 목록
-  const [filteredClubs, setFilteredClubs] = useState(sampleCentralClubs);
-  
-  // 분야 선택이 변경될 때마다 동아리 목록 필터링
-  useEffect(() => {
-    if (selectedCategory === '전체') {
-      setFilteredClubs(sampleCentralClubs);
-    } else {
-      setFilteredClubs(sampleCentralClubs.filter(club => club.department === selectedCategory));
-    }
-  }, [selectedCategory]);
-  
+  const { clubs, categories, error, getFilteredClubs, filterByCategory } = useClubs('Department');
+
+  const filteredClubs = getFilteredClubs(selectedCategory);
+  // 카테고리 선택 핸들러
+  const handleCategorySelect = async (category) => {
+    setSelectedCategory(category);
+    await filterByCategory(category);
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col bg-white-50">
+        <TopNavigator />
+        <main className="flex-grow flex items-center justify-center">
+          <div className="text-center">
+            <CustomText 
+              font="pretendard-600"
+              className="text-lg text-red-500 mb-4"
+            >
+              데이터를 불러오는 중 오류가 발생했습니다.
+            </CustomText>
+            <CustomText 
+              font="pretendard-400"
+              className="text-sm text-gray-600"
+            >
+              {error}
+            </CustomText>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-white-50">
       <div className="relative z-10">
         <TopNavigator />
       </div>
-      {/* 메인 컨텐츠 */}
       <main className="flex-grow flex justify-center">
         <div className="max-w-7xl w-full pt-6 pb-24 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            {/* 분야별 필터 추가 */}
             <CardFilter 
-              categories={allCategories}
+              categories={categories}
               selectedCategory={selectedCategory}
-              onCategorySelect={setSelectedCategory}
+              onCategorySelect={handleCategorySelect}
             />
             <CustomText 
                 font="pretendard-600"
@@ -48,7 +63,6 @@ const DepartmentClub = () => {
             >
                 학과 동아리 목록
             </CustomText>
-            {/* 필터링된 동아리 목록 */}
             <ClubCardGrid clubs={filteredClubs} />
           </div>
         </div>
