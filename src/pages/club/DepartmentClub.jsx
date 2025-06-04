@@ -9,7 +9,7 @@ import { useClubs } from '../../hooks/useClubs';
 
 const DepartmentClub = () => {
   const [selectedCategory, setSelectedCategory] = useState('전체');
-  const { clubs, categories, error, getFilteredClubs, filterByCategory } = useClubs('Department');
+  const { clubs, categories, error, getFilteredClubs, filterByCategory } = useClubs('DEPARTMENT');
 
   const filteredClubs = getFilteredClubs(selectedCategory);
   // 카테고리 선택 핸들러

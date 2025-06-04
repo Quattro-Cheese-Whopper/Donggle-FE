@@ -3,47 +3,98 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
+import { useClubImage } from '../../hooks/useClubImage';
 
 const ClubCard = ({ id, icon, name, description, category, isRecruiting }) => {
   const navigate = useNavigate();
+  const { imageUrl, loading, error } = useClubImage(id); // id를 직접 사용
 
   // 카드 클릭 핸들러
   const handleCardClick = () => {
     navigate(`/club/central/${id}`);
   };
 
+  // 이미지 렌더링 결정
+  const renderImage = () => {
+    if (loading) {
+      return (
+        <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      );
+    }
+
+    if (error || !imageUrl) {
+      // 기본 아이콘 또는 플레이스홀더 사용
+      if (icon) {
+        return <img src={icon} alt={`${name} 아이콘`} className="w-12 h-12 object-cover rounded-lg" />;
+      } else {
+        return (
+          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+          </div>
+        );
+      }
+    }
+
+    return (
+      <img 
+        src={imageUrl} 
+        alt={`${name} 프로필`} 
+        className="w-12 h-12 object-cover rounded-lg"
+        onError={(e) => {
+          // 이미지 로드 실패시 기본 이미지로 fallback
+          if (icon) {
+            e.target.src = icon;
+          } else {
+            e.target.style.display = 'none';
+            e.target.nextSibling.style.display = 'flex';
+          }
+        }}
+      />
+    );
+  };
+
   return (
     <div 
-      className="bg-white rounded-lg shadow-sm p-5 flex flex-col h-40 relative border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+      className="bg-white rounded-lg shadow-sm p-5 flex flex-col h-44 relative border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
       onClick={handleCardClick}
     >
-      {/* 동아리 아이콘 */}
-      <div className="mb-2">
-        <img src={icon} alt={`${name} 아이콘`} className="w-8 h-8" />
+      {/* 동아리 프로필 이미지 */}
+      <div className="mb-3">
+        {renderImage()}
+        {/* 이미지 로드 실패시 보여줄 플레이스홀더 (숨김 상태) */}
+        <div className="w-12 h-12 bg-gray-100 rounded-lg items-center justify-center hidden">
+          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        </div>
       </div>
       
       {/* 동아리 이름 */}
       <CustomText 
         font="pretendard-600"
-        className="text-xl mb-1"
+        className="text-lg mb-2"
         style={{ color: colors.black }}
       >
         {name}
       </CustomText>
       
       {/* 분과 및 카테고리 정보 */}
-      <div className="text-base">
+      <div className="text-sm flex-grow">
         <CustomText 
           font="pretendard-400" 
           style={{ color: colors.darkGray }}
-          className="block"
+          className="block mb-1"
         >
           {category}
         </CustomText>
         <CustomText 
           font="pretendard-400" 
           style={{ color: colors.darkGray }}
-          className="block"
+          className="block text-xs leading-relaxed"
         >
           {description}
         </CustomText>
@@ -167,9 +218,6 @@ const HorizontalClubCarousel = ({ clubs }) => {
     </div>
   );
 };
-
-// useState import 추가
-
 
 // 컴포넌트 내보내기
 export { ClubCard, ClubCardGrid, HorizontalClubCarousel };

@@ -1,7 +1,7 @@
 // src/hooks/useClubs.js
 import { useState, useEffect, useCallback } from 'react';
 import { clubService } from '../api/services/clubService';
-import { transformClubsCategories, mapCategoryToEnglish } from '../utils/categoryMapper';
+import { transformClubsCategories } from '../utils/categoryMapper';
 
 export const useClubs = (type = 'central') => {
   const [clubs, setClubs] = useState([]);
@@ -19,7 +19,6 @@ export const useClubs = (type = 'central') => {
       } else {
         response = await clubService.getClubsByType(type, params);
       }
-      
       
       const rawClubsData = response.data || response.content || response;
       
@@ -56,25 +55,31 @@ export const useClubs = (type = 'central') => {
     return clubs.filter(club => club.category === selectedCategory);
   }, [clubs]);
 
-  // 🔧 카테고리별 필터링 시 영어로 변환해서 API 호출
+  // 🔧 카테고리별 필터링 - 한글 그대로 API 호출
   const filterByCategory = useCallback(async (category) => {
     if (category === '전체') {
       await fetchClubs();
     } else {
       setError(null);
       try {
-        // 한국어 카테고리를 영어로 변환해서 API 호출
-        const englishCategory = mapCategoryToEnglish(category);
+        console.log(`🔍 카테고리별 조회: ${category}`);
         
-        const response = await clubService.getClubsByCategory(englishCategory);
+        // 한글 카테고리를 그대로 API에 전달
+        const response = await clubService.getClubsByCategory(category);
         const rawClubsData = response.data || response.content || response;
         
-        // 응답 받은 데이터도 한국어로 변환
+        // 응답 받은 데이터는 이미 한글이므로 변환 불필요할 수도 있음
         const transformedClubs = transformClubsCategories(rawClubsData);
         setClubs(transformedClubs);
       } catch (err) {
-        setError(err.message);
-        setClubs([]);
+        console.error('카테고리 필터링 에러:', err);
+        
+        // 카테고리 API 호출이 실패하면 클라이언트에서 필터링
+        console.log('🔄 서버 필터링 실패, 클라이언트에서 필터링 수행');
+        setError(null);
+        
+        // 전체 목록을 다시 가져와서 클라이언트에서 필터링
+        await fetchClubs();
       }
     }
   }, [fetchClubs]);

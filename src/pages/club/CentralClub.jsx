@@ -13,7 +13,7 @@ const CentralClub = () => {
 
   const filteredClubs = getFilteredClubs(selectedCategory);
   // 카테고리 선택 핸들러
-  const handleCategorySelect = async (category) => {
+  const handleCategorySelect = async (category) => {  
     setSelectedCategory(category);
     await filterByCategory(category);
   };
