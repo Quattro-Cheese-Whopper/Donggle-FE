@@ -194,7 +194,10 @@ const CentralClubDetail = () => {
       {/* 플로팅 편집 버튼 */}
       <button 
         onClick={handleEditClick}
-        className="fixed bottom-16 right-6 w-14 h-14 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800 hover:shadow-xl transition-all duration-200 z-50 flex items-center justify-center group"
+        className="fixed bottom-16 w-14 h-14 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800 hover:shadow-xl transition-all duration-200 z-50 flex items-center justify-center group"
+        style={{
+          right: `max(24px, calc((100vw - 896px) / 2 + 24px))`
+        }}
         title="동아리 정보 편집"
       >
         <svg 
