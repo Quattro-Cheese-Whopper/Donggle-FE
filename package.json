@@ -10,6 +10,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@lexical/history": "^0.32.0",
+    "@lexical/link": "^0.32.0",
+    "@lexical/list": "^0.32.0",
+    "@lexical/mark": "^0.32.0",
+    "@lexical/plain-text": "^0.32.0",
+    "@lexical/react": "^0.32.0",
+    "@lexical/rich-text": "^0.32.0",
+    "@lexical/utils": "^0.32.0",
+    "lexical": "^0.32.0",
+    "markdown-to-jsx": "^7.7.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.6.0"

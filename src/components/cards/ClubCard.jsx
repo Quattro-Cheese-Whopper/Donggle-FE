@@ -71,13 +71,6 @@ const ClubCard = ({ id, profileImageName, name, description, category, isRecruit
         >
           {category}
         </CustomText>
-        <CustomText 
-          font="pretendard-400" 
-          style={{ color: colors.darkGray }}
-          className="block text-xs leading-relaxed"
-        >
-          {description}
-        </CustomText>
       </div>
       
       {/* 모집 상태 배지 */}

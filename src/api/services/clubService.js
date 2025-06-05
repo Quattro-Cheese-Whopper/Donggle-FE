@@ -1,3 +1,4 @@
+// src/api/services/clubService.js
 import { apiClient } from '../client';
 
 export const clubService = {
@@ -16,7 +17,6 @@ export const clubService = {
   getClubsByType: async (type, params = {}) => {
     try {
       const response = await apiClient.get(`/clubs/type/${type}`, params);
-      console.log(response);
       return response;
     } catch (error) {
       console.error(`${type} 동아리 조회 실패:`, error);
@@ -72,7 +72,7 @@ export const clubService = {
     }
   },
 
-  // 내가 관리하는 동아리 목록 조회
+  // 🔧 내가 관리하는 동아리 목록 조회
   getMyClubs: async () => {
     try {
       const response = await apiClient.get('/clubs/my-clubs');
