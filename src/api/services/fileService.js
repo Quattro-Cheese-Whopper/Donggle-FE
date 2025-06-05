@@ -20,6 +20,71 @@ export const fileService = {
     return url;
   },
 
+  // 🔧 이미지 파일 업로드 (동아리용)
+  uploadFile: async (file, fileType = 'ANNOUNCE_ATTACHMENT', relatedId) => {
+    try {
+      console.log('📤 파일 업로드 시작:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType,
+        relatedId
+      });
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // fetch를 직접 사용 (FormData는 Content-Type을 자동 설정)
+      const response = await fetch(`${apiClient.baseURL}/files/upload/${fileType}/${relatedId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': localStorage.getItem('accessToken') ? 
+            `Bearer ${localStorage.getItem('accessToken')}` : ''
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`파일 업로드 실패: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ 파일 업로드 성공:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ 파일 업로드 실패:', error);
+      throw error;
+    }
+  },
+
+  // 🔧 Base64 이미지를 Blob으로 변환하여 업로드
+  uploadBase64Image: async (base64Data, fileName, fileType = 'ANNOUNCE_ATTACHMENT', relatedId) => {
+    try {
+      // Base64 데이터에서 실제 데이터 부분만 추출
+      const base64WithoutPrefix = base64Data.split(',')[1];
+      const mimeType = base64Data.split(',')[0].split(':')[1].split(';')[0];
+      
+      // Base64를 Blob으로 변환
+      const byteCharacters = atob(base64WithoutPrefix);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+      
+      // File 객체 생성
+      const file = new File([blob], fileName, { type: mimeType });
+      
+      // 업로드 수행
+      return await fileService.uploadFile(file, fileType, relatedId);
+    } catch (error) {
+      console.error('❌ Base64 이미지 업로드 실패:', error);
+      throw error;
+    }
+  },
+
   // 동아리 ID로 이미지 URL 가져오기 (두 단계 결합)
   getClubImageUrl: async (clubId) => {
     try {
