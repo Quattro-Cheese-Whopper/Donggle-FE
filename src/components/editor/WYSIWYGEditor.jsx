@@ -1,3 +1,5 @@
+// src/components/editor/WYSIWYGEditor.jsx 전체 수정
+
 import React, { useState, useRef, useEffect } from 'react';
 import colors from '../../constants/colors';
 import { fileService } from '../../api/services/fileService';
@@ -6,28 +8,79 @@ const WYSIWYGEditor = ({
   content = '', 
   onChange, 
   placeholder = '내용을 입력하세요...',
-  clubId, // 🔧 동아리 ID 추가
-  onGetProcessedContent // 🔧 콜백 함수로 처리된 콘텐츠 전달
+  clubId,
+  onGetProcessedContent
 }) => {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
   const [isActive, setIsActive] = useState(false);
-  const [uploadingImages, setUploadingImages] = useState(new Set()); // 업로드 중인 이미지 추적
+  const [uploadingImages, setUploadingImages] = useState(new Set());
+  const [isComposing, setIsComposing] = useState(false);
+  const debounceTimerRef = useRef(null); // 🔧 debounce 타이머
 
+  // 🔧 초기 content 설정 (한 번만)
+  const [isInitialized, setIsInitialized] = useState(false);
   useEffect(() => {
-    if (editorRef.current && content) {
+    if (editorRef.current && content && !isInitialized) {
       editorRef.current.innerHTML = content;
+      setIsInitialized(true);
     }
-  }, [content]);
+  }, [content, isInitialized]);
 
-  // 에디터 내용이 변경될 때 호출
+  // 🔧 debounced onChange 함수
+  const debouncedOnChange = (htmlContent) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    
+    debounceTimerRef.current = setTimeout(() => {
+      if (onChange) {
+        onChange(htmlContent);
+      }
+    }, 300); // 300ms 지연
+  };
+
+  // 🔧 한글 조합 핸들러
+  const handleCompositionStart = () => {
+    setIsComposing(true);
+  };
+
+  const handleCompositionEnd = () => {
+    setIsComposing(false);
+    if (editorRef.current) {
+      debouncedOnChange(editorRef.current.innerHTML);
+    }
+  };
+
+  // 🔧 입력 핸들러 (debounce 적용)
   const handleInput = () => {
+    if (!isComposing && editorRef.current) {
+      debouncedOnChange(editorRef.current.innerHTML);
+    }
+  };
+
+  // 🔧 즉시 동기화가 필요한 경우 (저장 시)
+  const syncContent = () => {
     if (editorRef.current && onChange) {
+      // 기존 타이머 취소
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+      // 즉시 onChange 호출
       onChange(editorRef.current.innerHTML);
     }
   };
 
-  // 🔧 Base64 이미지를 S3에 업로드하고 교체
+  // 🔧 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Base64 이미지를 S3에 업로드하고 교체
   const processBase64Images = async (htmlContent) => {
     if (!clubId) return htmlContent;
 
@@ -40,33 +93,25 @@ const WYSIWYGEditor = ({
     for (const img of images) {
       const src = img.getAttribute('src');
       
-      // Base64 이미지인지 확인
       if (src && src.startsWith('data:image/')) {
         try {
           console.log('🔄 Base64 이미지를 S3로 업로드 중...');
           
-          // 파일명 생성 (현재 시간 기반)
           const timestamp = Date.now();
           const mimeType = src.split(',')[0].split(':')[1].split(';')[0];
           const extension = mimeType.split('/')[1];
           const fileName = `image_${timestamp}.${extension}`;
           
-          // S3에 업로드
           const uploadResult = await fileService.uploadBase64Image(src, fileName, 'ANNOUNCE_ATTACHMENT', clubId);
           const storedName = uploadResult.downloadUrl.split('/').pop();
           const s3ImageUrl = `/api/files/download/${storedName}`;
           
-          // HTML에서 Base64 URL을 S3 URL로 교체
-          processedContent = processedContent.replace(
-            src,
-            s3ImageUrl
-          );
+          processedContent = processedContent.replace(src, s3ImageUrl);
           
           console.log('✅ Base64 이미지 S3 업로드 완료:', s3ImageUrl);
           
         } catch (error) {
           console.error('❌ Base64 이미지 업로드 실패:', error);
-          // 실패한 경우 원본 유지
         }
       }
     }
@@ -76,25 +121,26 @@ const WYSIWYGEditor = ({
 
   // 🔧 저장 시 Base64 이미지를 S3로 변환하는 함수
   const getProcessedContent = async () => {
+    // 🔧 저장 시에는 최신 내용을 즉시 동기화
+    syncContent();
+    
     const currentContent = editorRef.current ? editorRef.current.innerHTML : content;
     return await processBase64Images(currentContent);
   };
 
-  // 🔧 부모 컴포넌트에 함수 전달 (useEffect 사용)
   useEffect(() => {
     if (onGetProcessedContent) {
       onGetProcessedContent(getProcessedContent);
     }
   }, [clubId, onGetProcessedContent]);
 
-  // 🔧 이미지를 S3에 업로드하고 에디터에 삽입
+  // 이미지를 S3에 업로드하고 에디터에 삽입
   const uploadAndInsertImage = async (file) => {
     if (!clubId) {
       alert('동아리 ID가 없어 이미지를 업로드할 수 없습니다.');
       return;
     }
 
-    // 임시 이미지 ID 생성 (함수 최상단에서 선언)
     const tempImageId = `temp-${Date.now()}`;
     
     try {
@@ -102,7 +148,6 @@ const WYSIWYGEditor = ({
 
       console.log('🖼️ 이미지 S3 업로드 시작:', file.name);
 
-      // 임시 로딩 이미지를 먼저 삽입
       const loadingImageHtml = `
         <div id="${tempImageId}" style="margin: 10px 0; text-align: center; padding: 20px; background-color: #f5f5f5; border-radius: 8px;">
           <div style="display: inline-flex; align-items: center; gap: 8px;">
@@ -119,16 +164,13 @@ const WYSIWYGEditor = ({
       
       insertHtmlAtCursor(loadingImageHtml);
 
-      // S3에 이미지 업로드
       const uploadResult = await fileService.uploadFile(file, 'ANNOUNCE_ATTACHMENT', clubId);
       
       console.log('✅ S3 업로드 완료:', uploadResult);
 
-      // storedName 추출 (downloadUrl에서 파일명 부분)
       const storedName = uploadResult.downloadUrl.split('/').pop();
       const s3ImageUrl = `/api/files/download/${storedName}`;
 
-      // 로딩 이미지를 실제 이미지로 교체
       const tempElement = editorRef.current.querySelector(`#${tempImageId}`);
       if (tempElement) {
         const actualImageHtml = `<img src="${s3ImageUrl}" alt="${uploadResult.originalName}" style="max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; display: block;" data-stored-name="${storedName}" />`;
@@ -140,7 +182,6 @@ const WYSIWYGEditor = ({
     } catch (error) {
       console.error('❌ 이미지 업로드 실패:', error);
       
-      // 에러 발생시 로딩 이미지를 에러 메시지로 교체
       const tempElement = editorRef.current.querySelector(`#${tempImageId}`);
       if (tempElement) {
         const errorHtml = `
@@ -153,13 +194,13 @@ const WYSIWYGEditor = ({
       
       alert(`이미지 업로드에 실패했습니다: ${error.message}`);
     } finally {
-      // tempImageId는 이제 함수 스코프에서 접근 가능
       setUploadingImages(prev => {
         const newSet = new Set(prev);
         newSet.delete(tempImageId);
         return newSet;
       });
-      handleInput(); // 변경사항 알림
+      // 🔧 이미지 삽입 후 내용 동기화
+      syncContent();
     }
   };
 
@@ -183,11 +224,11 @@ const WYSIWYGEditor = ({
     }
   };
 
-  // 커서 위치에 이미지 삽입 (기존 방식 - 로컬 이미지용)
+  // 커서 위치에 이미지 삽입
   const insertImageAtCursor = (src, alt = '이미지') => {
     const imageHtml = `<img src="${src}" alt="${alt}" style="max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; display: block;" />`;
     insertHtmlAtCursor(imageHtml);
-    handleInput();
+    syncContent(); // 🔧 즉시 동기화
   };
 
   // 파일 업로드 처리
@@ -195,10 +236,8 @@ const WYSIWYGEditor = ({
     const file = e.target.files[0];
     if (file && file.type.startsWith('image/')) {
       if (clubId) {
-        // 🔧 클럽 ID가 있으면 S3에 업로드
         uploadAndInsertImage(file);
       } else {
-        // 클럽 ID가 없으면 기존 방식 (로컬 미리보기)
         const reader = new FileReader();
         reader.onload = (event) => {
           insertImageAtCursor(event.target.result, file.name);
@@ -226,7 +265,7 @@ const WYSIWYGEditor = ({
   const execCommand = (command, value = null) => {
     document.execCommand(command, false, value);
     editorRef.current.focus();
-    handleInput();
+    syncContent(); // 🔧 포맷팅 후 즉시 동기화
   };
 
   // 현재 선택된 텍스트의 포맷 상태 확인
@@ -287,12 +326,10 @@ const WYSIWYGEditor = ({
       {/* 툴바 */}
       <div className="border-b border-gray-200 p-3 bg-gray-50">
         <div className="flex flex-wrap items-center gap-2">
-          {/* 제목 스타일 */}
           <HeadingSelect />
           
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
           
-          {/* 텍스트 스타일 */}
           <ToolbarButton
             onClick={() => execCommand('bold')}
             active={isFormatActive('bold')}
@@ -325,7 +362,6 @@ const WYSIWYGEditor = ({
           
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
           
-          {/* 정렬 */}
           <ToolbarButton
             onClick={() => execCommand('justifyLeft')}
             title="왼쪽 정렬"
@@ -355,7 +391,6 @@ const WYSIWYGEditor = ({
           
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
           
-          {/* 목록 */}
           <ToolbarButton
             onClick={() => execCommand('insertUnorderedList')}
             title="글머리 기호"
@@ -376,7 +411,6 @@ const WYSIWYGEditor = ({
           
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
           
-          {/* 링크 */}
           <ToolbarButton
             onClick={() => {
               const url = prompt('링크 URL을 입력하세요:');
@@ -393,7 +427,6 @@ const WYSIWYGEditor = ({
           
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
           
-          {/* 이미지 업로드 */}
           <ToolbarButton
             onClick={handleImageUpload}
             title={clubId ? "이미지 업로드 (S3에 저장)" : "이미지 업로드"}
@@ -403,7 +436,6 @@ const WYSIWYGEditor = ({
             </svg>
           </ToolbarButton>
 
-          {/* URL로 이미지 삽입 */}
           <ToolbarButton
             onClick={handleImageUrl}
             title="이미지 URL로 삽입"
@@ -413,7 +445,6 @@ const WYSIWYGEditor = ({
             </svg>
           </ToolbarButton>
           
-          {/* 🔧 업로드 중 표시 */}
           {uploadingImages.size > 0 && (
             <div className="ml-2 flex items-center text-sm text-blue-600">
               <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -428,6 +459,8 @@ const WYSIWYGEditor = ({
         ref={editorRef}
         contentEditable
         onInput={handleInput}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         onFocus={() => setIsActive(true)}
         onBlur={() => setIsActive(false)}
         className={`p-4 min-h-[300px] outline-none transition-colors ${
@@ -442,7 +475,6 @@ const WYSIWYGEditor = ({
         suppressContentEditableWarning={true}
         data-placeholder={placeholder}
       />
-      
       
       <style jsx>{`
         [contenteditable]:empty:before {

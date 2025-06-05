@@ -4,27 +4,33 @@ import TopNavigator from '../../utils/navigate/TopNavigator';
 import Footer from '../../utils/footer/BottomFooter';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
+import ClubTabs from '../../components/tabs/ClubTabs';
 import WYSIWYGEditor from '../../components/editor/WYSIWYGEditor';
 import { clubService } from '../../api/services/clubService';
+import { recruitmentService } from '../../api/services/recruitmentService';
 import { useClubImage } from '../../hooks/useClubImage';
 
 const CentralClubEdit = () => {
   const { clubId } = useParams();
   const navigate = useNavigate();
   const [club, setClub] = useState(null);
+  const [recruitments, setRecruitments] = useState([]);
+  const [activeRecruitment, setActiveRecruitment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [hasFetchedClub, setHasFetchedClub] = useState(false);
+  const [activeTab, setActiveTab] = useState('intro');
+  const [hasFetchedData, setHasFetchedData] = useState(false);
   
-  // 🔧 WYSIWYG 에디터에서 getProcessedContent 함수를 받을 ref
-  const getProcessedContentRef = useRef(null);
+  // 🔧 WYSIWYG 에디터에서 getProcessedContent 함수를 받을 ref들
+  const getProcessedContentRef = useRef(null); // 동아리 소개용
+  const getRecruitmentProcessedContentRef = useRef(null); // 모집공고용
   
   // 동아리 이미지 로딩을 위한 훅
   const { imageUrl, loading: imageLoading, error: imageError } = useClubImage(club?.profileImageName);
   
-  // 편집 가능한 필드들의 상태
-  const [formData, setFormData] = useState({
+  // 편집 가능한 동아리 필드들의 상태
+  const [clubFormData, setClubFormData] = useState({
     name: '',
     memberCount: 0,
     location: '',
@@ -32,44 +38,122 @@ const CentralClubEdit = () => {
     description: '' // 상세 소개 (WYSIWYG로 편집)
   });
 
-  // API를 통해 동아리 상세 정보 가져오기
-  const fetchClubDetail = useCallback(async () => {
-    if (!clubId || hasFetchedClub) {
+  // 편집 가능한 모집공고 필드들의 상태
+  const [recruitmentFormData, setRecruitmentFormData] = useState({
+    title: '',
+    content: '',
+    recruitCount: 0,
+    startDate: '',
+    endDate: '',
+    status: 'RECRUITING',
+    contactInfo: ''
+  });
+
+  // 날짜를 input[type="date"] 형식으로 변환
+  function formatDateForInput(dateString) {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().slice(0, 10); // YYYY-MM-DD
+    } catch (error) {
+      console.error('날짜 포맷 오류:', error);
+      return '';
+    }
+  }
+
+  // input 형식의 날짜를 ISO 문자열로 변환
+  function formatDateForAPI(inputDate) {
+    if (!inputDate) return null;
+    try {
+      // 날짜만 선택했으므로 시간은 00:00:00으로 설정
+      return new Date(inputDate + 'T00:00:00').toISOString();
+    } catch (error) {
+      console.error('API 날짜 포맷 오류:', error);
+      return null;
+    }
+  }
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+  };
+
+  // 🔧 모집공고 데이터를 통해 동아리와 모집 정보를 한번에 가져오기
+  const fetchClubAndRecruitmentData = useCallback(async () => {
+    if (hasFetchedData) {
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      setHasFetchedClub(true);
+      setHasFetchedData(true);
       
-      console.log(`🔍 편집용 동아리 상세 정보 조회: ${clubId}`);
+      console.log(`🔍 편집용 동아리 모집공고 조회: ${clubId}`);
       
-      const response = await clubService.getClubDetail(clubId);
-      const clubData = response.data || response;
+      const response = await recruitmentService.getClubRecruitments(clubId);
+      const recruitmentData = response.data || response || [];
       
-      console.log('✅ 편집용 동아리 상세 정보:', clubData);
+      console.log('✅ 편집용 모집공고 데이터:', recruitmentData);
       
-      if (clubData) {
+      if (recruitmentData.length > 0) {
+        // 첫 번째 모집공고에서 동아리 정보 추출
+        const clubData = recruitmentData[0].club;
         setClub(clubData);
-        setFormData({
+        setClubFormData({
           name: clubData.name || '',
           memberCount: clubData.memberCount || 0,
           location: clubData.location || '',
           contactInfo: clubData.contactInfo || '',
           description: clubData.description || ''
         });
+        
+        // 모집공고 목록 설정
+        setRecruitments(recruitmentData);
+        
+        // 활성 모집공고 찾기 (RECRUITING 상태 우선, 없으면 첫 번째)
+        const activeRecruitment = recruitmentData.find(r => r.status === 'RECRUITING') || recruitmentData[0];
+        setActiveRecruitment(activeRecruitment);
+        
+        // 모집공고 폼 데이터 설정
+        setRecruitmentFormData({
+          title: activeRecruitment?.title || '',
+          content: activeRecruitment?.content || '',
+          recruitCount: activeRecruitment?.recruitCount || 0,
+          startDate: formatDateForInput(activeRecruitment?.startDate),
+          endDate: formatDateForInput(activeRecruitment?.endDate),
+          status: activeRecruitment?.status || 'RECRUITING',
+          contactInfo: activeRecruitment?.contactInfo || ''
+        });
+        
+        console.log('✅ 편집용 동아리 정보:', clubData);
+        console.log('✅ 편집용 활성 모집공고:', activeRecruitment);
       } else {
-        setError('동아리 정보를 찾을 수 없습니다.');
+        // 모집공고가 없는 경우 기본 clubService로 동아리 정보만 가져오기
+        console.log('📝 모집공고가 없어서 동아리 정보만 조회');
+        const clubResponse = await clubService.getClubDetail(clubId);
+        const clubData = clubResponse.data || clubResponse;
+        
+        setClub(clubData);
+        setClubFormData({
+          name: clubData.name || '',
+          memberCount: clubData.memberCount || 0,
+          location: clubData.location || '',
+          contactInfo: clubData.contactInfo || '',
+          description: clubData.description || ''
+        });
+        
+        // 모집공고는 빈 배열로 설정
+        setRecruitments([]);
+        setActiveRecruitment(null);
       }
     } catch (err) {
-      console.error('❌ 편집용 동아리 상세 정보 조회 실패:', err);
-      setError(err.message || '동아리 정보를 불러오는 중 오류가 발생했습니다.');
-      setHasFetchedClub(false);
+      console.error('❌ 편집용 데이터 조회 실패:', err);
+      setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
+      setHasFetchedData(false);
     } finally {
       setLoading(false);
     }
-  }, [clubId, hasFetchedClub]);
+  }, [clubId, hasFetchedData]);
 
   useEffect(() => {
     if (!clubId) {
@@ -78,56 +162,79 @@ const CentralClubEdit = () => {
       return;
     }
 
-    fetchClubDetail();
-  }, [fetchClubDetail]);
+    fetchClubAndRecruitmentData();
+  }, [fetchClubAndRecruitmentData]);
 
   // clubId 변경시 상태 리셋
   useEffect(() => {
-    setHasFetchedClub(false);
+    setHasFetchedData(false);
     setClub(null);
+    setRecruitments([]);
+    setActiveRecruitment(null);
     setError(null);
   }, [clubId]);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({
+  const handleClubInputChange = (field, value) => {
+    setClubFormData(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  // 🔧 에디터로부터 getProcessedContent 함수를 받는 콜백
+  const handleRecruitmentInputChange = (field, value) => {
+    setRecruitmentFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // 🔧 동아리 소개 에디터로부터 getProcessedContent 함수를 받는 콜백
   const handleGetProcessedContent = (getProcessedContentFn) => {
     getProcessedContentRef.current = getProcessedContentFn;
   };
 
-  // 🔧 저장 시 이미지 처리 포함
+  // 🔧 모집공고 에디터로부터 getProcessedContent 함수를 받는 콜백
+  const handleGetRecruitmentProcessedContent = (getProcessedContentFn) => {
+    getRecruitmentProcessedContentRef.current = getProcessedContentFn;
+  };
+
+  // 🔧 저장 시 현재 탭에 따라 다른 저장 함수 호출
   const handleSave = async () => {
+    if (activeTab === 'intro') {
+      await handleClubSave();
+    } else {
+      await handleRecruitmentSave();
+    }
+  };
+
+  // 🔧 동아리 정보 저장
+  const handleClubSave = async () => {
     setSaving(true);
     try {
-      console.log('💾 동아리 정보 업데이트 시작:', formData);
+      console.log('💾 동아리 정보 업데이트 시작:', clubFormData);
       
       // 🔧 WYSIWYG 에디터에서 처리된 콘텐츠 가져오기 (Base64 이미지 → S3 변환)
-      let processedDescription = formData.description;
+      let processedDescription = clubFormData.description;
       
       if (getProcessedContentRef.current) {
-        console.log('🖼️ 에디터 이미지 S3 업로드 처리 중...');
+        console.log('🖼️ 동아리 소개 이미지 S3 업로드 처리 중...');
         processedDescription = await getProcessedContentRef.current();
-        console.log('✅ 이미지 처리 완료');
+        console.log('✅ 동아리 소개 이미지 처리 완료');
       }
       
       // API 요청 형식에 맞게 데이터 변환
       const updateData = {
-        name: formData.name,
+        name: clubFormData.name,
         type: club.type,
         category: club.category,
         description: processedDescription, // 🔧 처리된 설명 사용
-        memberCount: formData.memberCount,
-        location: formData.location,
-        contactInfo: formData.contactInfo,
+        memberCount: clubFormData.memberCount,
+        location: clubFormData.location,
+        contactInfo: clubFormData.contactInfo,
         profileImageName: club.profileImageName
       };
       
-      console.log('📤 서버로 전송할 데이터:', updateData);
+      console.log('📤 서버로 전송할 동아리 데이터:', updateData);
       
       // API 호출로 동아리 정보 업데이트
       await clubService.updateClub(clubId, updateData);
@@ -139,8 +246,59 @@ const CentralClubEdit = () => {
       
     } catch (error) {
       console.error('❌ 동아리 정보 업데이트 실패:', error);
-      setSaving(false);
       alert('저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 🔧 모집공고 저장
+  const handleRecruitmentSave = async () => {
+    setSaving(true);
+    try {
+      console.log('💾 모집공고 정보 업데이트 시작:', recruitmentFormData);
+      
+      if (!activeRecruitment || !activeRecruitment.id) {
+        alert('수정할 모집공고가 없습니다.');
+        setSaving(false);
+        return;
+      }
+
+      // 🔧 WYSIWYG 에디터에서 처리된 콘텐츠 가져오기 (Base64 이미지 → S3 변환)
+      let processedContent = recruitmentFormData.content;
+      
+      if (getRecruitmentProcessedContentRef.current) {
+        console.log('🖼️ 모집공고 이미지 S3 업로드 처리 중...');
+        processedContent = await getRecruitmentProcessedContentRef.current();
+        console.log('✅ 모집공고 이미지 처리 완료');
+      }
+      
+      // API 요청 형식에 맞게 데이터 변환
+      const updateData = {
+        title: recruitmentFormData.title,
+        content: processedContent, // 🔧 처리된 설명 사용
+        recruitCount: recruitmentFormData.recruitCount,
+        startDate: formatDateForAPI(recruitmentFormData.startDate),
+        endDate: formatDateForAPI(recruitmentFormData.endDate),
+        status: recruitmentFormData.status,
+        contactInfo: recruitmentFormData.contactInfo
+      };
+      
+      console.log('📤 서버로 전송할 모집공고 데이터:', updateData);
+      
+      // API 호출로 모집공고 정보 업데이트
+      await recruitmentService.updateRecruitment(activeRecruitment.id, updateData);
+      
+      console.log('✅ 모집공고 정보 업데이트 성공');
+      
+      // 성공 후 상세 페이지로 돌아가기
+      navigate(`/club/central/${clubId}`);
+      
+    } catch (error) {
+      console.error('❌ 모집공고 정보 업데이트 실패:', error);
+      alert('저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -203,6 +361,13 @@ const CentralClubEdit = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-white-50">
+      {/* 🔧 스크롤바로 인한 레이아웃 변화 방지 */}
+      <style jsx global>{`
+        html {
+          overflow-y: scroll;
+        }
+      `}</style>
+      
       <div className="relative z-10">
         <TopNavigator />
       </div>
@@ -253,116 +418,273 @@ const CentralClubEdit = () => {
       
       <main className="flex-grow flex justify-center">
         <div className="max-w-screen-lg w-full pb-24 sm:px-6 lg:px-8">
-          <div className="px-4 py-8">
+          <div className="px-4">
+            {/* 🔧 탭 추가 */}
+            <ClubTabs 
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+            />
             
-            {/* 기본 정보 편집 */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-              <CustomText 
-                font="pretendard-700"
-                className="text-lg mb-4"
-                style={{ color: colors.black }}
-              >
-                기본 정보
-              </CustomText>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    동아리명
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    인원수
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.memberCount}
-                    onChange={(e) => handleInputChange('memberCount', parseInt(e.target.value) || 0)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    동아리방
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.location}
-                    onChange={(e) => handleInputChange('location', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="예: 정보전산원 3층"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    관련 링크
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.contactInfo}
-                    onChange={(e) => handleInputChange('contactInfo', e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="https://example.com"
-                  />
-                </div>
-              </div>
-            </div>
+            <div className="mt-8">
+              {/* 🔧 탭에 따른 편집 폼 표시 */}
+              {activeTab === 'intro' ? (
+                // 동아리 소개 편집
+                <div className="space-y-6">
+                  {/* 기본 정보 편집 */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <CustomText 
+                      font="pretendard-700"
+                      className="text-lg mb-4"
+                      style={{ color: colors.black }}
+                    >
+                      기본 정보
+                    </CustomText>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          동아리명
+                        </label>
+                        <input
+                          type="text"
+                          value={clubFormData.name}
+                          onChange={(e) => handleClubInputChange('name', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          인원수
+                        </label>
+                        <input
+                          type="number"
+                          value={clubFormData.memberCount}
+                          onChange={(e) => handleClubInputChange('memberCount', parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          min="0"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          동아리방
+                        </label>
+                        <input
+                          type="text"
+                          value={clubFormData.location}
+                          onChange={(e) => handleClubInputChange('location', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="예: 정보전산원 3층"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          관련 링크
+                        </label>
+                        <input
+                          type="url"
+                          value={clubFormData.contactInfo}
+                          onChange={(e) => handleClubInputChange('contactInfo', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="https://example.com"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-            {/* 🔧 상세 소개 WYSIWYG 에디터 - clubId 전달 */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <CustomText 
-                font="pretendard-700"
-                className="text-lg mb-4"
-                style={{ color: colors.black }}
-              >
-                상세 소개
-              </CustomText>
-              
-              <div className="mt-4">
-                <WYSIWYGEditor
-                  content={formData.description}
-                  onChange={(content) => handleInputChange('description', content)}
-                  placeholder="동아리에 대한 상세한 소개를 작성해주세요..."
-                  clubId={clubId} // 🔧 동아리 ID 전달
-                  onGetProcessedContent={handleGetProcessedContent} // 🔧 콜백 함수 전달
-                />
-              </div>
-            </div>
+                  {/* 상세 소개 WYSIWYG 에디터 */}
+                  <div className="bg-white rounded-lg border border-gray-200 p-6">
+                    <CustomText 
+                      font="pretendard-700"
+                      className="text-lg mb-4"
+                      style={{ color: colors.black }}
+                    >
+                      상세 소개
+                    </CustomText>
+                    
+                    <div className="mt-4">
+                      <WYSIWYGEditor
+                        content={clubFormData.description}
+                        onChange={(content) => handleClubInputChange('description', content)}
+                        placeholder="동아리에 대한 상세한 소개를 작성해주세요..."
+                        clubId={clubId}
+                        onGetProcessedContent={handleGetProcessedContent}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // 🔧 신입 모집 편집 - 동일한 구조
+                activeRecruitment ? (
+                  <div className="space-y-6">
+                    {/* 기본 정보 편집 */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <CustomText 
+                        font="pretendard-700"
+                        className="text-lg mb-4"
+                        style={{ color: colors.black }}
+                      >
+                        기본 정보
+                      </CustomText>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집분야
+                          </label>
+                          <input
+                            type="text"
+                            value={recruitmentFormData.title}
+                            onChange={(e) => handleRecruitmentInputChange('title', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="예: FE, BE, AI, GAME, PM, DE"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집인원
+                          </label>
+                          <input
+                            type="number"
+                            value={recruitmentFormData.recruitCount}
+                            onChange={(e) => handleRecruitmentInputChange('recruitCount', parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            min="0"
+                            placeholder="0 (0이면 '인원 미정'으로 표시)"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집 시작일
+                          </label>
+                          <input
+                            type="date"
+                            value={recruitmentFormData.startDate}
+                            onChange={(e) => handleRecruitmentInputChange('startDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집 마감일
+                          </label>
+                          <input
+                            type="date"
+                            value={recruitmentFormData.endDate}
+                            onChange={(e) => handleRecruitmentInputChange('endDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집상태
+                          </label>
+                          <select
+                            value={recruitmentFormData.status}
+                            onChange={(e) => handleRecruitmentInputChange('status', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="RECRUITING">모집중</option>
+                            <option value="ALWAYS_RECRUITING">상시모집</option>
+                            <option value="COMPLETED">모집종료</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            관련링크
+                          </label>
+                          <input
+                            type="url"
+                            value={recruitmentFormData.contactInfo}
+                            onChange={(e) => handleRecruitmentInputChange('contactInfo', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="https://recruit.example.com"
+                          />
+                        </div>
+                      </div>
+                    </div>
 
-            {/* 저장/취소 버튼 */}
-            <div className="flex justify-end space-x-3 mt-6">
-              <button 
-                onClick={handleCancel}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                disabled={saving}
-              >
-                취소
-              </button>
-              <button 
-                onClick={handleSave}
-                disabled={saving}
-                className="px-6 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors disabled:opacity-50 flex items-center"
-              >
-                {saving ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    저장 중...
-                  </>
+                    {/* 상세 소개 WYSIWYG 에디터 */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <CustomText 
+                        font="pretendard-700"
+                        className="text-lg mb-4"
+                        style={{ color: colors.black }}
+                      >
+                        상세 소개
+                      </CustomText>
+                      
+                      <div className="mt-4">
+                        <WYSIWYGEditor
+                          content={recruitmentFormData.content}
+                          onChange={(content) => handleRecruitmentInputChange('content', content)}
+                          placeholder="모집에 대한 상세한 정보를 작성해주세요..."
+                          clubId={clubId}
+                          onGetProcessedContent={handleGetRecruitmentProcessedContent}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 ) : (
-                  '저장'
-                )}
-              </button>
+                  // 모집공고가 없는 경우
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                    <CustomText 
+                      font="pretendard-600"
+                      className="text-lg mb-4"
+                      style={{ color: colors.black }}
+                    >
+                      등록된 모집공고가 없습니다
+                    </CustomText>
+                    <CustomText 
+                      font="pretendard-500"
+                      className="text-base mb-6"
+                      style={{ color: colors.darkGray }}
+                    >
+                      먼저 모집공고를 생성해주세요.
+                    </CustomText>
+                    <button 
+                      onClick={handleCancel}
+                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      돌아가기
+                    </button>
+                  </div>
+                )
+              )}
+
+              {/* 🔧 공통 저장/취소 버튼 - 모집공고가 있을 때만 표시 */}
+              {(activeTab === 'intro' || (activeTab === 'recruit' && activeRecruitment)) && (
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button 
+                    onClick={handleCancel}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    disabled={saving}
+                  >
+                    취소
+                  </button>
+                  <button 
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-6 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors disabled:opacity-50 flex items-center"
+                  >
+                    {saving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                        저장 중...
+                      </>
+                    ) : (
+                      '저장'
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
