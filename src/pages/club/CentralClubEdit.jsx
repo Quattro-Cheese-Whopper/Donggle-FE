@@ -265,17 +265,11 @@ const CentralClubEdit = () => {
     }
   };
 
-  // 🔧 모집공고 저장
+  // 🔧 모집공고 저장 (기존 수정 또는 신규 생성)
   const handleRecruitmentSave = async () => {
     setSaving(true);
     try {
-      console.log('💾 모집공고 정보 업데이트 시작:', recruitmentFormData);
-      
-      if (!activeRecruitment || !activeRecruitment.id) {
-        alert('수정할 모집공고가 없습니다.');
-        setSaving(false);
-        return;
-      }
+      console.log('💾 모집공고 정보 업데이트/생성 시작:', recruitmentFormData);
 
       // 🔧 WYSIWYG 에디터에서 처리된 콘텐츠 가져오기 (Base64 이미지 → S3 변환)
       let processedContent = recruitmentFormData.content;
@@ -287,7 +281,7 @@ const CentralClubEdit = () => {
       }
       
       // API 요청 형식에 맞게 데이터 변환
-      const updateData = {
+      const requestData = {
         title: recruitmentFormData.title,
         content: processedContent, // 🔧 처리된 설명 사용
         recruitCount: recruitmentFormData.recruitCount,
@@ -297,18 +291,30 @@ const CentralClubEdit = () => {
         contactInfo: recruitmentFormData.contactInfo
       };
       
-      console.log('📤 서버로 전송할 모집공고 데이터:', updateData);
+      console.log('📤 서버로 전송할 모집공고 데이터:', requestData);
       
-      // API 호출로 모집공고 정보 업데이트
-      await recruitmentService.updateRecruitment(activeRecruitment.id, updateData);
-      
-      console.log('✅ 모집공고 정보 업데이트 성공');
+      if (hasRecruitments && activeRecruitment?.id) {
+        // 🔧 기존 모집공고 수정
+        console.log('✏️ 기존 모집공고 수정:', activeRecruitment.id);
+        await recruitmentService.updateRecruitment(activeRecruitment.id, requestData);
+        console.log('✅ 모집공고 수정 성공');
+      } else {
+        // 🔧 새 모집공고 생성
+        console.log('➕ 새 모집공고 생성 for clubId:', clubId);
+        const response = await recruitmentService.createRecruitmentForClub(clubId, requestData);
+        console.log('✅ 모집공고 생성 성공:', response);
+        
+        // 생성 후 상태 업데이트
+        setHasRecruitments(true);
+        setActiveRecruitment(response.data || response);
+        setRecruitments([response.data || response]);
+      }
       
       // 성공 후 상세 페이지로 돌아가기
       navigate(`/club/central/${clubId}`);
       
     } catch (error) {
-      console.error('❌ 모집공고 정보 업데이트 실패:', error);
+      console.error('❌ 모집공고 정보 저장 실패:', error);
       alert('저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setSaving(false);
@@ -531,6 +537,7 @@ const CentralClubEdit = () => {
               ) : (
                 // 🔧 신입 모집 편집 - 모집공고 여부에 따라 분기
                 hasRecruitments && activeRecruitment ? (
+                  // 기존 모집공고 수정
                   <div className="space-y-6">
                     {/* 기본 정보 편집 */}
                     <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -646,34 +653,126 @@ const CentralClubEdit = () => {
                     </div>
                   </div>
                 ) : (
-                  // 🔧 모집공고가 없는 경우
-                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                    <CustomText 
-                      font="pretendard-600"
-                      className="text-lg mb-4"
-                      style={{ color: colors.black }}
-                    >
-                      등록된 모집공고가 작성되지 않았습니다
-                    </CustomText>
-                    <CustomText 
-                      font="pretendard-500"
-                      className="text-base mb-6"
-                      style={{ color: colors.darkGray }}
-                    >
-                      모집공고 기능은 현재 개발 중입니다.
-                    </CustomText>
-                    <button 
-                      onClick={() => setActiveTab('intro')}
-                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      동아리 소개 편집하기
-                    </button>
+                  // 🔧 새 모집공고 작성 폼
+                  <div className="space-y-6">
+                    {/* 기본 정보 편집 */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <CustomText 
+                        font="pretendard-700"
+                        className="text-lg mb-4"
+                        style={{ color: colors.black }}
+                      >
+                        기본 정보
+                      </CustomText>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집분야
+                          </label>
+                          <input
+                            type="text"
+                            value={recruitmentFormData.title}
+                            onChange={(e) => handleRecruitmentInputChange('title', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="예: FE, BE, AI, GAME, PM, DE"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집인원
+                          </label>
+                          <input
+                            type="number"
+                            value={recruitmentFormData.recruitCount}
+                            onChange={(e) => handleRecruitmentInputChange('recruitCount', parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            min="0"
+                            placeholder="0 (0이면 '인원 미정'으로 표시)"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집 시작일
+                          </label>
+                          <input
+                            type="date"
+                            value={recruitmentFormData.startDate}
+                            onChange={(e) => handleRecruitmentInputChange('startDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집 마감일
+                          </label>
+                          <input
+                            type="date"
+                            value={recruitmentFormData.endDate}
+                            onChange={(e) => handleRecruitmentInputChange('endDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집상태
+                          </label>
+                          <select
+                            value={recruitmentFormData.status}
+                            onChange={(e) => handleRecruitmentInputChange('status', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="RECRUITING">모집중</option>
+                            <option value="ALWAYS_RECRUITING">상시모집</option>
+                            <option value="COMPLETED">모집종료</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            관련링크
+                          </label>
+                          <input
+                            type="url"
+                            value={recruitmentFormData.contactInfo}
+                            onChange={(e) => handleRecruitmentInputChange('contactInfo', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="https://recruit.example.com"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 상세 소개 WYSIWYG 에디터 */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <CustomText 
+                        font="pretendard-700"
+                        className="text-lg mb-4"
+                        style={{ color: colors.black }}
+                      >
+                        상세 소개
+                      </CustomText>
+                      
+                      <div className="mt-4">
+                        <WYSIWYGEditor
+                          content={recruitmentFormData.content}
+                          onChange={(content) => handleRecruitmentInputChange('content', content)}
+                          placeholder="모집에 대한 상세한 정보를 작성해주세요..."
+                          clubId={clubId}
+                          onGetProcessedContent={handleGetRecruitmentProcessedContent}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )
               )}
 
-              {/* 🔧 공통 저장/취소 버튼 - 동아리 소개 탭이거나 모집공고가 있을 때만 표시 */}
-              {(activeTab === 'intro' || (activeTab === 'recruit' && hasRecruitments && activeRecruitment)) && (
+              {/* 🔧 공통 저장/취소 버튼 - 동아리 소개 탭이거나 신입모집 탭(모집공고 작성/수정 가능)일 때 표시 */}
+              {(activeTab === 'intro' || activeTab === 'recruit') && (
                 <div className="flex justify-end space-x-3 mt-6">
                   <button 
                     onClick={handleCancel}
@@ -693,7 +792,7 @@ const CentralClubEdit = () => {
                         저장 중...
                       </>
                     ) : (
-                      '저장'
+                      activeTab === 'recruit' && !hasRecruitments ? '모집공고 생성' : '저장'
                     )}
                   </button>
                 </div>
