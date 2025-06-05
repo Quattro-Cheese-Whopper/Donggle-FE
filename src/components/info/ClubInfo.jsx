@@ -94,14 +94,14 @@ const ClubInfoBoard = ({ club, style = "introduce" }) => {
   
   if (style === "introduce") {
     const leftItems = [
-      { label: '인원수', value: club.memberCount || '40+' },
+      { label: '인원수', value: club.memberCount },
     ];
     
     const rightItems = [
-      { label: '동아리방', value: club.clubRoom || '정보전산원 3층' },
+      { label: '동아리방', value: club.location },
     ];
     
-    const website = club.website || 'https://econovation.kr/';
+    const website = club.contactInfo;
 
     return (
       <InfoBoard 

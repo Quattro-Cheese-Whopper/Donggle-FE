@@ -1,4 +1,4 @@
-// src/api/client.js - 디버깅 버전
+// src/api/client.js - 토큰 만료 500 에러 처리 추가
 import { apiConfig } from './config';
 import { tokenManager } from '../utils/tokenManager';
 
@@ -68,6 +68,7 @@ class ApiClient {
         headers: Object.fromEntries(response.headers.entries())
       });
 
+      // 401 인증 오류 처리
       if (response.status === 401 && !endpoint.includes('/auth/')) {
         return this.handleTokenRefresh(url, config);
       }
@@ -75,14 +76,24 @@ class ApiClient {
       if (!response.ok) {
         // 🔍 에러 응답 본문 확인
         let errorBody;
+        let errorJson = null;
         try {
           errorBody = await response.text();
           console.error('❌ 에러 응답 본문:', errorBody);
           
           // JSON 파싱 시도
           try {
-            const errorJson = JSON.parse(errorBody);
+            errorJson = JSON.parse(errorBody);
             console.error('❌ 에러 JSON:', errorJson);
+            
+            // 🔧 500 에러이지만 토큰 만료 메시지인 경우 토큰 리프레시 시도
+            if (response.status === 500 && 
+                errorJson.message && 
+                errorJson.message.includes('Token is expired') &&
+                !endpoint.includes('/auth/')) {
+              console.log('🔄 500 에러이지만 토큰 만료로 판단, 토큰 리프레시 시도');
+              return this.handleTokenRefresh(url, config);
+            }
           } catch (e) {
             console.error('❌ 에러 응답이 JSON이 아님');
           }
@@ -119,9 +130,11 @@ class ApiClient {
     this.isRefreshing = true;
 
     try {
+      console.log('🔄 토큰 리프레시 시도...');
       const { authService } = await import('./services/authService');
       await authService.refreshToken();
       
+      console.log('✅ 토큰 리프레시 성공');
       this.processQueue(null);
       
       const authHeader = tokenManager.getAuthHeader();
@@ -129,6 +142,7 @@ class ApiClient {
         originalConfig.headers.Authorization = authHeader;
       }
       
+      console.log('🔄 원래 요청 재시도...');
       const response = await fetch(originalUrl, originalConfig);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -136,7 +150,11 @@ class ApiClient {
       
       return await response.json();
     } catch (error) {
+      console.error('❌ 토큰 리프레시 실패:', error);
       this.processQueue(error, null);
+      
+      // 토큰 리프레시 실패시 로그인 페이지로 리다이렉트
+      console.log('➡️ 로그인 페이지로 리다이렉트');
       window.location.href = '/signin';
       throw error;
     } finally {

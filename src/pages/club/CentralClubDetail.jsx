@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Markdown from 'markdown-to-jsx';
 import TopNavigator from '../../utils/navigate/TopNavigator';
 import Footer from '../../utils/footer/BottomFooter';
 import CustomText from '../../utils/CustomText';
@@ -7,6 +8,7 @@ import colors from '../../constants/colors';
 import ClubTabs from '../../components/tabs/ClubTabs';
 import { ClubInfoBoard } from '../../components/info/ClubInfo';
 import { useAuth } from '../../hooks/useAuth';
+import { useClubImage } from '../../hooks/useClubImage';
 import { clubService } from '../../api/services/clubService';
 
 const CentralClubDetail = () => {
@@ -16,8 +18,13 @@ const CentralClubDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('intro');
+  const [hasFetchedClub, setHasFetchedClub] = useState(false);
+  const [hasFetchedMyClubs, setHasFetchedMyClubs] = useState(false);
 
   const { isLoggedIn, isMyClub, fetchMyClubs, myClubs } = useAuth();
+  
+  // 동아리 이미지 로딩을 위한 훅 (club이 로드된 후에 사용)
+  const { imageUrl, loading: imageLoading, error: imageError } = useClubImage(club?.profileImageName);
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -28,48 +35,96 @@ const CentralClubDetail = () => {
     navigate(`/club/central/${clubId}/edit`);
   };
 
-  // 내 동아리 정보 조회 (로그인시 한 번만)
-  useEffect(() => {
-    if (isLoggedIn && myClubs.length === 0) {
-      console.log('🏢 동아리 상세 페이지에서 내 동아리 정보 조회');
-      fetchMyClubs();
+  // AbortController를 사용한 중복 방지
+  const fetchClubDetail = useCallback(async (abortController) => {
+    if (hasFetchedClub) {
+      console.log(`⏭️ 이미 동아리 정보를 가져왔음, 스킵`);
+      return;
     }
-  }, [isLoggedIn]);
 
-  // API를 통해 동아리 상세 정보 가져오기
-  useEffect(() => {
-    const fetchClubDetail = async () => {
-      if (!clubId) {
-        setError('동아리 ID가 없습니다.');
-        setLoading(false);
+    try {
+      setLoading(true);
+      setError(null);
+      setHasFetchedClub(true);
+      
+      console.log(`🔍 동아리 상세 정보 조회: ${clubId}`);
+      
+      const response = await clubService.getClubDetail(clubId);
+      
+      // 요청이 취소되었는지 확인
+      if (abortController.signal.aborted) {
+        console.log('🚫 요청이 취소됨');
         return;
       }
-
-      try {
-        setLoading(true);
-        setError(null);
-        
-        console.log(`🔍 동아리 상세 정보 조회: ${clubId}`);
-        
-        const response = await clubService.getClubDetail(clubId);
-        const clubData = response.data || response;
-        
-        console.log('✅ 동아리 상세 정보:', clubData);
-        
-        if (clubData) {
-          setClub(clubData);
-        } else {
-          setError('동아리 정보를 찾을 수 없습니다.');
-        }
-      } catch (err) {
-        console.error('❌ 동아리 상세 정보 조회 실패:', err);
-        setError(err.message || '동아리 정보를 불러오는 중 오류가 발생했습니다.');
-      } finally {
+      
+      const clubData = response.data || response;
+      
+      console.log('✅ 동아리 상세 정보:', clubData);
+      
+      if (clubData) {
+        setClub(clubData);
+      } else {
+        setError('동아리 정보를 찾을 수 없습니다.');
+      }
+    } catch (err) {
+      if (abortController.signal.aborted) {
+        console.log('🚫 요청이 취소됨 (에러)');
+        return;
+      }
+      
+      console.error('❌ 동아리 상세 정보 조회 실패:', err);
+      setError(err.message || '동아리 정보를 불러오는 중 오류가 발생했습니다.');
+      setHasFetchedClub(false); // 에러 발생시 재시도 가능하게
+    } finally {
+      if (!abortController.signal.aborted) {
         setLoading(false);
       }
-    };
+    }
+  }, [clubId, hasFetchedClub]);
 
-    fetchClubDetail();
+  // 내 동아리 정보 조회
+  const fetchMyClubsOnce = useCallback(async () => {
+    if (hasFetchedMyClubs || !isLoggedIn || myClubs.length > 0) {
+      return;
+    }
+
+    try {
+      console.log('🏢 동아리 상세 페이지에서 내 동아리 정보 조회');
+      setHasFetchedMyClubs(true);
+      
+      await fetchMyClubs();
+    } catch (error) {
+      console.warn('⚠️ 내 동아리 정보 조회 실패 (토큰 만료 가능성):', error.message);
+      setHasFetchedMyClubs(false); // 실패시 다시 시도할 수 있도록
+    }
+  }, [isLoggedIn, myClubs.length, fetchMyClubs, hasFetchedMyClubs]);
+
+  // 동아리 상세 정보 가져오기
+  useEffect(() => {
+    if (!clubId) {
+      setError('동아리 ID가 없습니다.');
+      setLoading(false);
+      return;
+    }
+
+    const abortController = new AbortController();
+    fetchClubDetail(abortController);
+
+    return () => {
+      abortController.abort();
+    };
+  }, [clubId, fetchClubDetail]);
+
+  // 내 동아리 정보 조회
+  useEffect(() => {
+    fetchMyClubsOnce();
+  }, [fetchMyClubsOnce]);
+
+  // clubId 변경시 상태 리셋
+  useEffect(() => {
+    setHasFetchedClub(false);
+    setClub(null);
+    setError(null);
   }, [clubId]);
 
   const handleGoBack = () => {
@@ -143,27 +198,24 @@ const CentralClubDetail = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="mr-6">
-                {club.icon ? (
+                {/* 동아리 이미지 렌더링 */}
+                {imageLoading ? (
+                  <div className="w-28 h-28 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : imageError || !imageUrl ? (
+                  <div className="w-28 h-28 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                ) : (
                   <img 
-                    src={club.icon} 
+                    src={imageUrl} 
                     alt={`${club.name} 로고`} 
-                    className="w-28 h-28 object-contain"
-                    onError={(e) => {
-                      // 이미지 로드 실패시 기본 플레이스홀더 표시
-                      e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
-                    }}
+                    className="w-28 h-28 object-cover rounded-lg"
                   />
-                ) : null}
-                {/* 기본 플레이스홀더 */}
-                <div 
-                  className="w-28 h-28 bg-gray-100 rounded-lg flex items-center justify-center"
-                  style={{ display: club.icon ? 'none' : 'flex' }}
-                >
-                  <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
+                )}
               </div>
               <div>
                 <CustomText 
@@ -172,6 +224,13 @@ const CentralClubDetail = () => {
                   style={{ color: colors.black }}
                 >
                   {club.name}
+                </CustomText>
+                <CustomText 
+                  font="pretendard-500"
+                  className="text-base mb-1"
+                  style={{ color: colors.darkGray }}
+                >
+                  {club.type === 'CENTRAL' ? '중앙동아리' : club.department || club.type}
                 </CustomText>
                 <CustomText 
                   font="pretendard-500"
@@ -221,25 +280,8 @@ const CentralClubDetail = () => {
               <ClubInfoBoard club={club} 
                 style={activeTab === 'intro' ? 'introduce' : 'recruit'} />
               
-              {/* 상세 설명 표시 (intro 탭에서만) */}
-              {activeTab === 'intro' && club.detailedDescription && (
-                <div className="mt-6">
-                  <CustomText 
-                    font="pretendard-700"
-                    className="text-lg mb-4"
-                    style={{ color: colors.black }}
-                  >
-                    상세 소개
-                  </CustomText>
-                  <div 
-                    className="bg-white rounded-lg border border-gray-200 p-6 prose max-w-none"
-                    dangerouslySetInnerHTML={{ __html: club.detailedDescription }}
-                  />
-                </div>
-              )}
-              
-              {/* 기본 설명이 있는 경우 표시 */}
-              {activeTab === 'intro' && !club.detailedDescription && club.description && (
+              {/* 동아리 소개 표시 (마크다운 렌더링) */}
+              {activeTab === 'intro' && club.description && (
                 <div className="mt-6">
                   <CustomText 
                     font="pretendard-700"
@@ -249,13 +291,84 @@ const CentralClubDetail = () => {
                     동아리 소개
                   </CustomText>
                   <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <CustomText 
-                      font="pretendard-400"
-                      className="text-base leading-relaxed"
-                      style={{ color: colors.black }}
-                    >
-                      {club.description}
-                    </CustomText>
+                    <div className="prose prose-lg max-w-none leading-relaxed">
+                      <Markdown
+                        options={{
+                          overrides: {
+                            h1: {
+                              props: {
+                                className: 'text-2xl font-bold mb-4 mt-8',
+                                style: { color: colors.black }
+                              }
+                            },
+                            h2: {
+                              props: {
+                                className: 'text-xl font-bold mb-3 mt-6',
+                                style: { color: colors.black }
+                              }
+                            },
+                            h3: {
+                              props: {
+                                className: 'text-lg font-semibold mb-2 mt-4',
+                                style: { color: colors.black }
+                              }
+                            },
+                            p: {
+                              props: {
+                                className: 'mb-4 leading-relaxed',
+                                style: { color: colors.black }
+                              }
+                            },
+                            strong: {
+                              props: {
+                                className: 'font-semibold'
+                              }
+                            },
+                            em: {
+                              props: {
+                                className: 'italic'
+                              }
+                            },
+                            code: {
+                              props: {
+                                className: 'bg-gray-100 px-2 py-1 rounded text-sm font-mono'
+                              }
+                            },
+                            blockquote: {
+                              props: {
+                                className: 'border-l-4 border-gray-300 pl-4 my-4 italic',
+                                style: { color: colors.darkGray }
+                              }
+                            },
+                            ul: {
+                              props: {
+                                className: 'list-disc list-inside mb-4 space-y-1'
+                              }
+                            },
+                            ol: {
+                              props: {
+                                className: 'list-decimal list-inside mb-4 space-y-1'
+                              }
+                            },
+                            li: {
+                              props: {
+                                className: 'leading-relaxed',
+                                style: { color: colors.black }
+                              }
+                            },
+                            a: {
+                              props: {
+                                className: 'text-blue-600 hover:text-blue-800 underline',
+                                target: '_blank',
+                                rel: 'noopener noreferrer'
+                              }
+                            }
+                          }
+                        }}
+                      >
+                        {club.description}
+                      </Markdown>
+                    </div>
                   </div>
                 </div>
               )}
