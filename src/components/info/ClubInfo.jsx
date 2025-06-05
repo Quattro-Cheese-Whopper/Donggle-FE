@@ -95,7 +95,6 @@ const ClubInfoBoard = ({ club, style = "introduce" }) => {
   if (style === "introduce") {
     const leftItems = [
       { label: '인원수', value: club.memberCount || '40+' },
-      { label: '활동 내용', value: club.mainActivity || '프로젝트 개발' }
     ];
     
     const rightItems = [
