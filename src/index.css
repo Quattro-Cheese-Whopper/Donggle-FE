@@ -1,3 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* 스크롤바로 인한 레이아웃 변화 방지 */
+html {
+  overflow-y: scroll;
+}
+
+/* 또는 스크롤바 공간을 항상 예약하는 다른 방법 */
+body {
+  scrollbar-gutter: stable;
+}
