@@ -5,16 +5,16 @@ import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 import { useClubImage } from '../../hooks/useClubImage';
 
-const ClubCard = ({ id, icon, name, description, category, isRecruiting }) => {
+const ClubCard = ({ id, profileImageName, name, description, category, isRecruiting }) => {
   const navigate = useNavigate();
-  const { imageUrl, loading, error } = useClubImage(id); // id를 직접 사용
+  const { imageUrl, loading, error } = useClubImage(profileImageName);
 
   // 카드 클릭 핸들러
   const handleCardClick = () => {
     navigate(`/club/central/${id}`);
   };
 
-  // 이미지 렌더링 결정
+  // 이미지 렌더링
   const renderImage = () => {
     if (loading) {
       return (
@@ -25,18 +25,13 @@ const ClubCard = ({ id, icon, name, description, category, isRecruiting }) => {
     }
 
     if (error || !imageUrl) {
-      // 기본 아이콘 또는 플레이스홀더 사용
-      if (icon) {
-        return <img src={icon} alt={`${name} 아이콘`} className="w-12 h-12 object-cover rounded-lg" />;
-      } else {
-        return (
-          <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-        );
-      }
+      return (
+        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        </div>
+      );
     }
 
     return (
@@ -44,15 +39,6 @@ const ClubCard = ({ id, icon, name, description, category, isRecruiting }) => {
         src={imageUrl} 
         alt={`${name} 프로필`} 
         className="w-12 h-12 object-cover rounded-lg"
-        onError={(e) => {
-          // 이미지 로드 실패시 기본 이미지로 fallback
-          if (icon) {
-            e.target.src = icon;
-          } else {
-            e.target.style.display = 'none';
-            e.target.nextSibling.style.display = 'flex';
-          }
-        }}
       />
     );
   };
@@ -65,12 +51,6 @@ const ClubCard = ({ id, icon, name, description, category, isRecruiting }) => {
       {/* 동아리 프로필 이미지 */}
       <div className="mb-3">
         {renderImage()}
-        {/* 이미지 로드 실패시 보여줄 플레이스홀더 (숨김 상태) */}
-        <div className="w-12 h-12 bg-gray-100 rounded-lg items-center justify-center hidden">
-          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        </div>
       </div>
       
       {/* 동아리 이름 */}
@@ -131,7 +111,7 @@ const ClubCardGrid = ({ clubs }) => {
         <ClubCard
           key={club.id}
           id={club.id}
-          icon={club.icon}
+          profileImageName={club.profileImageName}
           name={club.name}
           description={club.description}
           category={club.category}
@@ -150,7 +130,6 @@ const HorizontalClubCarousel = ({ clubs }) => {
   // 이전 페이지로 이동
   const goToPrevious = () => {
     if (currentIndex === 0) {
-      // 첫 페이지에서 이전을 누르면 마지막으로 이동
       const lastPageStartIndex = Math.floor((totalItems - 1) / itemsPerPage) * itemsPerPage;
       setCurrentIndex(lastPageStartIndex);
     } else {
@@ -161,14 +140,13 @@ const HorizontalClubCarousel = ({ clubs }) => {
   // 다음 페이지로 이동
   const goToNext = () => {
     if (currentIndex + itemsPerPage >= totalItems) {
-      // 마지막 페이지에서 다음을 누르면 처음으로 이동
       setCurrentIndex(0);
     } else {
       setCurrentIndex(currentIndex + itemsPerPage);
     }
   };
   
-  // 현재 화면에 표시할 동아리 (최대 3개)
+  // 현재 화면에 표시할 동아리
   const visibleClubs = clubs.slice(currentIndex, currentIndex + itemsPerPage);
   
   return (
@@ -190,9 +168,9 @@ const HorizontalClubCarousel = ({ clubs }) => {
           <div key={club.id} className="flex-1 min-w-0">
             <ClubCard
               id={club.id}
-              icon={club.icon}
+              profileImageName={club.profileImageName}
               name={club.name}
-              department={club.department}
+              description={club.description}
               category={club.category}
               isRecruiting={club.isRecruiting}
             />
