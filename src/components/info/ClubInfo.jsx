@@ -15,13 +15,18 @@ const InfoItem = ({ label, value }) => {
         </CustomText>
       </div>
       <div className="pl-4">
-        <CustomText 
-          font="pretendard-500"
-          className="text-sm text-left"
-          style={{ color: colors.black }}
-        >
-          {value}
-        </CustomText>
+        {/* 🔧 값이 React 컴포넌트인 경우와 문자열인 경우 모두 처리 */}
+        {React.isValidElement(value) ? (
+          value
+        ) : (
+          <CustomText 
+            font="pretendard-500"
+            className="text-sm text-left"
+            style={{ color: colors.black }}
+          >
+            {value}
+          </CustomText>
+        )}
       </div>
     </div>
   );
@@ -89,6 +94,7 @@ const InfoBoard = ({ leftItems, rightItems, website }) => {
     </div>
   );
 };
+
 const ClubInfoBoard = ({ club, style = "introduce" }) => {
   if (!club) return null;
   
