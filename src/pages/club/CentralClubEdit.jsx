@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import TopNavigator from '../../utils/navigate/TopNavigator';
 import Footer from '../../utils/footer/BottomFooter';
@@ -16,6 +16,9 @@ const CentralClubEdit = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [hasFetchedClub, setHasFetchedClub] = useState(false);
+  
+  // 🔧 WYSIWYG 에디터에서 getProcessedContent 함수를 받을 ref
+  const getProcessedContentRef = useRef(null);
   
   // 동아리 이미지 로딩을 위한 훅
   const { imageUrl, loading: imageLoading, error: imageError } = useClubImage(club?.profileImageName);
@@ -92,17 +95,32 @@ const CentralClubEdit = () => {
     }));
   };
 
+  // 🔧 에디터로부터 getProcessedContent 함수를 받는 콜백
+  const handleGetProcessedContent = (getProcessedContentFn) => {
+    getProcessedContentRef.current = getProcessedContentFn;
+  };
+
+  // 🔧 저장 시 이미지 처리 포함
   const handleSave = async () => {
     setSaving(true);
     try {
       console.log('💾 동아리 정보 업데이트 시작:', formData);
+      
+      // 🔧 WYSIWYG 에디터에서 처리된 콘텐츠 가져오기 (Base64 이미지 → S3 변환)
+      let processedDescription = formData.description;
+      
+      if (getProcessedContentRef.current) {
+        console.log('🖼️ 에디터 이미지 S3 업로드 처리 중...');
+        processedDescription = await getProcessedContentRef.current();
+        console.log('✅ 이미지 처리 완료');
+      }
       
       // API 요청 형식에 맞게 데이터 변환
       const updateData = {
         name: formData.name,
         type: club.type,
         category: club.category,
-        description: formData.description,
+        description: processedDescription, // 🔧 처리된 설명 사용
         memberCount: formData.memberCount,
         location: formData.location,
         contactInfo: formData.contactInfo,
@@ -301,7 +319,7 @@ const CentralClubEdit = () => {
               </div>
             </div>
 
-            {/* 상세 소개 WYSIWYG 에디터 */}
+            {/* 🔧 상세 소개 WYSIWYG 에디터 - clubId 전달 */}
             <div className="bg-white rounded-lg border border-gray-200 p-6">
               <CustomText 
                 font="pretendard-700"
@@ -316,6 +334,8 @@ const CentralClubEdit = () => {
                   content={formData.description}
                   onChange={(content) => handleInputChange('description', content)}
                   placeholder="동아리에 대한 상세한 소개를 작성해주세요..."
+                  clubId={clubId} // 🔧 동아리 ID 전달
+                  onGetProcessedContent={handleGetProcessedContent} // 🔧 콜백 함수 전달
                 />
               </div>
             </div>
@@ -332,9 +352,16 @@ const CentralClubEdit = () => {
               <button 
                 onClick={handleSave}
                 disabled={saving}
-                className="px-6 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors disabled:opacity-50"
+                className="px-6 py-2 bg-green-700 text-white rounded-lg hover:bg-green-800 transition-colors disabled:opacity-50 flex items-center"
               >
-                {saving ? '저장 중...' : '저장'}
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    저장 중...
+                  </>
+                ) : (
+                  '저장'
+                )}
               </button>
             </div>
           </div>

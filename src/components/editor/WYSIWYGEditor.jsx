@@ -1,16 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import colors from '../../constants/colors';
+import { fileService } from '../../api/services/fileService';
 
-const WYSIWYGEditor = ({ content = '', onChange, placeholder = '내용을 입력하세요...' }) => {
+const WYSIWYGEditor = ({ 
+  content = '', 
+  onChange, 
+  placeholder = '내용을 입력하세요...',
+  clubId, // 🔧 동아리 ID 추가
+  onGetProcessedContent // 🔧 콜백 함수로 처리된 콘텐츠 전달
+}) => {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
   const [isActive, setIsActive] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(new Set()); // 업로드 중인 이미지 추적
 
   useEffect(() => {
     if (editorRef.current && content) {
       editorRef.current.innerHTML = content;
     }
-  }, []);
+  }, [content]);
 
   // 에디터 내용이 변경될 때 호출
   const handleInput = () => {
@@ -19,34 +27,166 @@ const WYSIWYGEditor = ({ content = '', onChange, placeholder = '내용을 입력
     }
   };
 
-  // 커서 위치에 이미지 삽입
-  const insertImageAtCursor = (src, alt = '이미지') => {
+  // 🔧 Base64 이미지를 S3에 업로드하고 교체
+  const processBase64Images = async (htmlContent) => {
+    if (!clubId) return htmlContent;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const images = doc.querySelectorAll('img');
+    
+    let processedContent = htmlContent;
+    
+    for (const img of images) {
+      const src = img.getAttribute('src');
+      
+      // Base64 이미지인지 확인
+      if (src && src.startsWith('data:image/')) {
+        try {
+          console.log('🔄 Base64 이미지를 S3로 업로드 중...');
+          
+          // 파일명 생성 (현재 시간 기반)
+          const timestamp = Date.now();
+          const mimeType = src.split(',')[0].split(':')[1].split(';')[0];
+          const extension = mimeType.split('/')[1];
+          const fileName = `image_${timestamp}.${extension}`;
+          
+          // S3에 업로드
+          const uploadResult = await fileService.uploadBase64Image(src, fileName, 'ANNOUNCE_ATTACHMENT', clubId);
+          const storedName = uploadResult.downloadUrl.split('/').pop();
+          const s3ImageUrl = `/api/files/download/${storedName}`;
+          
+          // HTML에서 Base64 URL을 S3 URL로 교체
+          processedContent = processedContent.replace(
+            src,
+            s3ImageUrl
+          );
+          
+          console.log('✅ Base64 이미지 S3 업로드 완료:', s3ImageUrl);
+          
+        } catch (error) {
+          console.error('❌ Base64 이미지 업로드 실패:', error);
+          // 실패한 경우 원본 유지
+        }
+      }
+    }
+    
+    return processedContent;
+  };
+
+  // 🔧 저장 시 Base64 이미지를 S3로 변환하는 함수
+  const getProcessedContent = async () => {
+    const currentContent = editorRef.current ? editorRef.current.innerHTML : content;
+    return await processBase64Images(currentContent);
+  };
+
+  // 🔧 부모 컴포넌트에 함수 전달 (useEffect 사용)
+  useEffect(() => {
+    if (onGetProcessedContent) {
+      onGetProcessedContent(getProcessedContent);
+    }
+  }, [clubId, onGetProcessedContent]);
+
+  // 🔧 이미지를 S3에 업로드하고 에디터에 삽입
+  const uploadAndInsertImage = async (file) => {
+    if (!clubId) {
+      alert('동아리 ID가 없어 이미지를 업로드할 수 없습니다.');
+      return;
+    }
+
+    // 임시 이미지 ID 생성 (함수 최상단에서 선언)
+    const tempImageId = `temp-${Date.now()}`;
+    
+    try {
+      setUploadingImages(prev => new Set([...prev, tempImageId]));
+
+      console.log('🖼️ 이미지 S3 업로드 시작:', file.name);
+
+      // 임시 로딩 이미지를 먼저 삽입
+      const loadingImageHtml = `
+        <div id="${tempImageId}" style="margin: 10px 0; text-align: center; padding: 20px; background-color: #f5f5f5; border-radius: 8px;">
+          <div style="display: inline-flex; align-items: center; gap: 8px;">
+            <div style="width: 20px; height: 20px; border: 2px solid #4f46e5; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <span style="color: #6b7280; font-size: 14px;">이미지 업로드 중...</span>
+          </div>
+        </div>
+        <style>
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        </style>
+      `;
+      
+      insertHtmlAtCursor(loadingImageHtml);
+
+      // S3에 이미지 업로드
+      const uploadResult = await fileService.uploadFile(file, 'ANNOUNCE_ATTACHMENT', clubId);
+      
+      console.log('✅ S3 업로드 완료:', uploadResult);
+
+      // storedName 추출 (downloadUrl에서 파일명 부분)
+      const storedName = uploadResult.downloadUrl.split('/').pop();
+      const s3ImageUrl = `/api/files/download/${storedName}`;
+
+      // 로딩 이미지를 실제 이미지로 교체
+      const tempElement = editorRef.current.querySelector(`#${tempImageId}`);
+      if (tempElement) {
+        const actualImageHtml = `<img src="${s3ImageUrl}" alt="${uploadResult.originalName}" style="max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; display: block;" data-stored-name="${storedName}" />`;
+        tempElement.outerHTML = actualImageHtml;
+      }
+
+      console.log('✅ 에디터에 S3 이미지 삽입 완료');
+      
+    } catch (error) {
+      console.error('❌ 이미지 업로드 실패:', error);
+      
+      // 에러 발생시 로딩 이미지를 에러 메시지로 교체
+      const tempElement = editorRef.current.querySelector(`#${tempImageId}`);
+      if (tempElement) {
+        const errorHtml = `
+          <div style="margin: 10px 0; padding: 15px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; color: #dc2626; text-align: center;">
+            이미지 업로드에 실패했습니다: ${error.message}
+          </div>
+        `;
+        tempElement.outerHTML = errorHtml;
+      }
+      
+      alert(`이미지 업로드에 실패했습니다: ${error.message}`);
+    } finally {
+      // tempImageId는 이제 함수 스코프에서 접근 가능
+      setUploadingImages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(tempImageId);
+        return newSet;
+      });
+      handleInput(); // 변경사항 알림
+    }
+  };
+
+  // 커서 위치에 HTML 삽입
+  const insertHtmlAtCursor = (html) => {
     editorRef.current.focus();
     
-    // 이미지 HTML 생성
-    const imageHtml = `<img src="${src}" alt="${alt}" style="max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; display: block;" />`;
-    
-    // 현재 선택 영역 가져오기
     const selection = window.getSelection();
     
     if (selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
       
-      // 선택된 내용이 에디터 안에 있는지 확인
       if (editorRef.current.contains(range.commonAncestorContainer) || 
           editorRef.current === range.commonAncestorContainer) {
-        
-        // HTML로 삽입
-        document.execCommand('insertHTML', false, imageHtml);
+        document.execCommand('insertHTML', false, html);
       } else {
-        // 에디터 끝에 추가
-        editorRef.current.innerHTML += imageHtml;
+        editorRef.current.innerHTML += html;
       }
     } else {
-      // 선택 영역이 없으면 에디터 끝에 추가
-      editorRef.current.innerHTML += imageHtml;
+      editorRef.current.innerHTML += html;
     }
-    
+  };
+
+  // 커서 위치에 이미지 삽입 (기존 방식 - 로컬 이미지용)
+  const insertImageAtCursor = (src, alt = '이미지') => {
+    const imageHtml = `<img src="${src}" alt="${alt}" style="max-width: 100%; height: auto; margin: 10px 0; border-radius: 8px; display: block;" />`;
+    insertHtmlAtCursor(imageHtml);
     handleInput();
   };
 
@@ -54,13 +194,18 @@ const WYSIWYGEditor = ({ content = '', onChange, placeholder = '내용을 입력
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        insertImageAtCursor(event.target.result, file.name);
-      };
-      reader.readAsDataURL(file);
+      if (clubId) {
+        // 🔧 클럽 ID가 있으면 S3에 업로드
+        uploadAndInsertImage(file);
+      } else {
+        // 클럽 ID가 없으면 기존 방식 (로컬 미리보기)
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          insertImageAtCursor(event.target.result, file.name);
+        };
+        reader.readAsDataURL(file);
+      }
     }
-    // input 값 초기화 (같은 파일 다시 선택 가능하도록)
     e.target.value = '';
   };
 
@@ -178,7 +323,6 @@ const WYSIWYGEditor = ({ content = '', onChange, placeholder = '내용을 입력
             </svg>
           </ToolbarButton>
           
-          
           <div className="w-px h-6 bg-gray-300 mx-1"></div>
           
           {/* 정렬 */}
@@ -252,13 +396,30 @@ const WYSIWYGEditor = ({ content = '', onChange, placeholder = '내용을 입력
           {/* 이미지 업로드 */}
           <ToolbarButton
             onClick={handleImageUpload}
-            title="이미지 업로드"
+            title={clubId ? "이미지 업로드 (S3에 저장)" : "이미지 업로드"}
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
             </svg>
           </ToolbarButton>
+
+          {/* URL로 이미지 삽입 */}
+          <ToolbarButton
+            onClick={handleImageUrl}
+            title="이미지 URL로 삽입"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/>
+            </svg>
+          </ToolbarButton>
           
+          {/* 🔧 업로드 중 표시 */}
+          {uploadingImages.size > 0 && (
+            <div className="ml-2 flex items-center text-sm text-blue-600">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+              이미지 업로드 중... ({uploadingImages.size}개)
+            </div>
+          )}
         </div>
       </div>
       
@@ -281,6 +442,7 @@ const WYSIWYGEditor = ({ content = '', onChange, placeholder = '내용을 입력
         suppressContentEditableWarning={true}
         data-placeholder={placeholder}
       />
+      
       
       <style jsx>{`
         [contenteditable]:empty:before {

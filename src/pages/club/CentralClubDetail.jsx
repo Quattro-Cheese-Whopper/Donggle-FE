@@ -1,15 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import Markdown from 'markdown-to-jsx';
 import TopNavigator from '../../utils/navigate/TopNavigator';
 import Footer from '../../utils/footer/BottomFooter';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 import ClubTabs from '../../components/tabs/ClubTabs';
 import { ClubInfoBoard } from '../../components/info/ClubInfo';
+import S3HtmlRenderer from '../../components/editor/S3HtmlRenderer'; // 🔧 향상된 렌더러 추가
 import { useAuth } from '../../hooks/useAuth';
 import { useClubImage } from '../../hooks/useClubImage';
 import { clubService } from '../../api/services/clubService';
+import { apiClient } from '../../api/client'; // 🔧 디버깅용 추가
 
 const CentralClubDetail = () => {
   const { clubId } = useParams();
@@ -280,7 +281,7 @@ const CentralClubDetail = () => {
               <ClubInfoBoard club={club} 
                 style={activeTab === 'intro' ? 'introduce' : 'recruit'} />
               
-              {/* 동아리 소개 표시 (마크다운 렌더링) */}
+              {/* 🔧 동아리 소개 표시 (S3 이미지 지원 HTML 렌더링) */}
               {activeTab === 'intro' && club.description && (
                 <div className="mt-6">
                   <CustomText 
@@ -291,84 +292,103 @@ const CentralClubDetail = () => {
                     동아리 소개
                   </CustomText>
                   <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    <div className="prose prose-lg max-w-none leading-relaxed">
-                      <Markdown
-                        options={{
-                          overrides: {
-                            h1: {
-                              props: {
-                                className: 'text-2xl font-bold mb-4 mt-8',
-                                style: { color: colors.black }
-                              }
-                            },
-                            h2: {
-                              props: {
-                                className: 'text-xl font-bold mb-3 mt-6',
-                                style: { color: colors.black }
-                              }
-                            },
-                            h3: {
-                              props: {
-                                className: 'text-lg font-semibold mb-2 mt-4',
-                                style: { color: colors.black }
-                              }
-                            },
-                            p: {
-                              props: {
-                                className: 'mb-4 leading-relaxed',
-                                style: { color: colors.black }
-                              }
-                            },
-                            strong: {
-                              props: {
-                                className: 'font-semibold'
-                              }
-                            },
-                            em: {
-                              props: {
-                                className: 'italic'
-                              }
-                            },
-                            code: {
-                              props: {
-                                className: 'bg-gray-100 px-2 py-1 rounded text-sm font-mono'
-                              }
-                            },
-                            blockquote: {
-                              props: {
-                                className: 'border-l-4 border-gray-300 pl-4 my-4 italic',
-                                style: { color: colors.darkGray }
-                              }
-                            },
-                            ul: {
-                              props: {
-                                className: 'list-disc list-inside mb-4 space-y-1'
-                              }
-                            },
-                            ol: {
-                              props: {
-                                className: 'list-decimal list-inside mb-4 space-y-1'
-                              }
-                            },
-                            li: {
-                              props: {
-                                className: 'leading-relaxed',
-                                style: { color: colors.black }
-                              }
-                            },
-                            a: {
-                              props: {
-                                className: 'text-blue-600 hover:text-blue-800 underline',
-                                target: '_blank',
-                                rel: 'noopener noreferrer'
-                              }
-                            }
-                          }
-                        }}
-                      >
-                        {club.description}
-                      </Markdown>
-                    </div>
+                    {/* 🔧 향상된 S3 이미지 렌더러 사용 */}
+                    <S3HtmlRenderer 
+                      htmlContent={club.description}
+                      className="prose prose-lg max-w-none leading-relaxed"
+                    />
+                    
+                    {/* 🔧 추가 스타일링 */}
+                    <style jsx>{`
+                      :global(.prose h1) {
+                        font-size: 2em;
+                        font-weight: bold;
+                        margin: 0.67em 0;
+                        color: ${colors.black};
+                      }
+                      
+                      :global(.prose h2) {
+                        font-size: 1.5em;
+                        font-weight: bold;
+                        margin: 0.75em 0;
+                        color: ${colors.black};
+                      }
+                      
+                      :global(.prose h3) {
+                        font-size: 1.17em;
+                        font-weight: bold;
+                        margin: 0.83em 0;
+                        color: ${colors.black};
+                      }
+                      
+                      :global(.prose p) {
+                        margin: 1em 0;
+                        line-height: 1.6;
+                        color: ${colors.black};
+                      }
+                      
+                      :global(.prose strong) {
+                        font-weight: 600;
+                      }
+                      
+                      :global(.prose em) {
+                        font-style: italic;
+                      }
+                      
+                      :global(.prose code) {
+                        background-color: #f3f4f6;
+                        padding: 2px 6px;
+                        border-radius: 4px;
+                        font-size: 0.875em;
+                        font-family: 'Monaco', 'Menlo', monospace;
+                      }
+                      
+                      :global(.prose blockquote) {
+                        border-left: 4px solid #d1d5db;
+                        padding-left: 1rem;
+                        margin: 1em 0;
+                        font-style: italic;
+                        color: ${colors.darkGray};
+                      }
+                      
+                      :global(.prose ul) {
+                        list-style-type: disc;
+                        list-style-position: inside;
+                        margin: 1em 0;
+                        padding-left: 1em;
+                      }
+                      
+                      :global(.prose ol) {
+                        list-style-type: decimal;
+                        list-style-position: inside;
+                        margin: 1em 0;
+                        padding-left: 1em;
+                      }
+                      
+                      :global(.prose li) {
+                        margin: 0.5em 0;
+                        line-height: 1.6;
+                        color: ${colors.black};
+                      }
+                      
+                      :global(.prose a) {
+                        color: #2563eb;
+                        text-decoration: underline;
+                      }
+                      
+                      :global(.prose a:hover) {
+                        color: #1d4ed8;
+                      }
+                      
+                      :global(.prose img) {
+                        max-width: 100%;
+                        height: auto;
+                        margin: 1em 0;
+                        border-radius: 8px;
+                        display: block;
+                        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+                      }
+                    `}</style>
                   </div>
                 </div>
               )}
