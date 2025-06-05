@@ -6,20 +6,22 @@ import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 import ClubTabs from '../../components/tabs/ClubTabs';
 import { ClubInfoBoard } from '../../components/info/ClubInfo';
-import S3HtmlRenderer from '../../components/editor/S3HtmlRenderer'; // 🔧 향상된 렌더러 추가
+import { RecruitmentInfoBoard } from '../../components/info/RecruitmentInfo';
+import S3HtmlRenderer from '../../components/editor/S3HtmlRenderer';
 import { useAuth } from '../../hooks/useAuth';
 import { useClubImage } from '../../hooks/useClubImage';
-import { clubService } from '../../api/services/clubService';
-import { apiClient } from '../../api/client'; // 🔧 디버깅용 추가
+import { recruitmentService } from '../../api/services/recruitmentService';
 
 const CentralClubDetail = () => {
   const { clubId } = useParams();
   const navigate = useNavigate();
   const [club, setClub] = useState(null);
+  const [recruitments, setRecruitments] = useState([]);
+  const [activeRecruitment, setActiveRecruitment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('intro');
-  const [hasFetchedClub, setHasFetchedClub] = useState(false);
+  const [hasFetchedData, setHasFetchedData] = useState(false);
   const [hasFetchedMyClubs, setHasFetchedMyClubs] = useState(false);
 
   const { isLoggedIn, isMyClub, fetchMyClubs, myClubs } = useAuth();
@@ -36,52 +38,52 @@ const CentralClubDetail = () => {
     navigate(`/club/central/${clubId}/edit`);
   };
 
-  // AbortController를 사용한 중복 방지
-  const fetchClubDetail = useCallback(async (abortController) => {
-    if (hasFetchedClub) {
-      console.log(`⏭️ 이미 동아리 정보를 가져왔음, 스킵`);
+  // 🔧 모집공고 데이터를 통해 동아리와 모집 정보를 한번에 가져오기
+  const fetchClubAndRecruitmentData = useCallback(async () => {
+    if (hasFetchedData) {
+      console.log(`⏭️ 이미 데이터를 가져왔음, 스킵`);
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      setHasFetchedClub(true);
+      setHasFetchedData(true);
       
-      console.log(`🔍 동아리 상세 정보 조회: ${clubId}`);
+      console.log(`🔍 동아리 모집공고 조회: ${clubId}`);
       
-      const response = await clubService.getClubDetail(clubId);
+      const response = await recruitmentService.getClubRecruitments(clubId);
+      const recruitmentData = response.data || response || [];
       
-      // 요청이 취소되었는지 확인
-      if (abortController.signal.aborted) {
-        console.log('🚫 요청이 취소됨');
-        return;
-      }
+      console.log('✅ 모집공고 데이터:', recruitmentData);
       
-      const clubData = response.data || response;
-      
-      console.log('✅ 동아리 상세 정보:', clubData);
-      
-      if (clubData) {
+      if (recruitmentData.length > 0) {
+        // 첫 번째 모집공고에서 동아리 정보 추출
+        const clubData = recruitmentData[0].club;
         setClub(clubData);
+        
+        // 모집공고 목록 설정
+        setRecruitments(recruitmentData);
+        
+        // 활성 모집공고 찾기 (RECRUITING 상태 우선, 없으면 첫 번째)
+        const activeRecruitment = recruitmentData.find(r => r.status === 'RECRUITING') || recruitmentData[0];
+        setActiveRecruitment(activeRecruitment);
+        
+        console.log('✅ 동아리 정보:', clubData);
+        console.log('✅ 활성 모집공고:', activeRecruitment);
       } else {
-        setError('동아리 정보를 찾을 수 없습니다.');
+        // 모집공고가 없는 경우에도 동아리 정보를 가져와야 할 수 있음
+        // 이 경우 기존 clubService를 사용하거나 에러 처리
+        setError('등록된 모집공고가 없습니다.');
       }
     } catch (err) {
-      if (abortController.signal.aborted) {
-        console.log('🚫 요청이 취소됨 (에러)');
-        return;
-      }
-      
-      console.error('❌ 동아리 상세 정보 조회 실패:', err);
-      setError(err.message || '동아리 정보를 불러오는 중 오류가 발생했습니다.');
-      setHasFetchedClub(false); // 에러 발생시 재시도 가능하게
+      console.error('❌ 동아리 및 모집공고 조회 실패:', err);
+      setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
+      setHasFetchedData(false);
     } finally {
-      if (!abortController.signal.aborted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
-  }, [clubId, hasFetchedClub]);
+  }, [clubId, hasFetchedData]);
 
   // 내 동아리 정보 조회
   const fetchMyClubsOnce = useCallback(async () => {
@@ -96,11 +98,11 @@ const CentralClubDetail = () => {
       await fetchMyClubs();
     } catch (error) {
       console.warn('⚠️ 내 동아리 정보 조회 실패 (토큰 만료 가능성):', error.message);
-      setHasFetchedMyClubs(false); // 실패시 다시 시도할 수 있도록
+      setHasFetchedMyClubs(false);
     }
   }, [isLoggedIn, myClubs.length, fetchMyClubs, hasFetchedMyClubs]);
 
-  // 동아리 상세 정보 가져오기
+  // 데이터 가져오기
   useEffect(() => {
     if (!clubId) {
       setError('동아리 ID가 없습니다.');
@@ -108,13 +110,8 @@ const CentralClubDetail = () => {
       return;
     }
 
-    const abortController = new AbortController();
-    fetchClubDetail(abortController);
-
-    return () => {
-      abortController.abort();
-    };
-  }, [clubId, fetchClubDetail]);
+    fetchClubAndRecruitmentData();
+  }, [clubId, fetchClubAndRecruitmentData]);
 
   // 내 동아리 정보 조회
   useEffect(() => {
@@ -123,8 +120,10 @@ const CentralClubDetail = () => {
 
   // clubId 변경시 상태 리셋
   useEffect(() => {
-    setHasFetchedClub(false);
+    setHasFetchedData(false);
     setClub(null);
+    setRecruitments([]);
+    setActiveRecruitment(null);
     setError(null);
   }, [clubId]);
 
@@ -240,23 +239,31 @@ const CentralClubDetail = () => {
                 >
                   {club.category}
                 </CustomText>
-                <div 
-                  className="my-2 px-3 py-1 rounded-lg inline-block"
-                  style={{ 
-                    backgroundColor: club.isRecruiting ? colors.primary : colors.lightGray,
-                  }}
-                >
-                  <CustomText 
-                    font="pretendard-400"
-                    className="text-xs"
-                    style={{ 
-                      color: club.isRecruiting ? colors.white : colors.mediumGray,
-                      margin: 0,
-                    }}
-                  >
-                    {club.isRecruiting ? '모집중' : '모집종료'}
-                  </CustomText>
-                </div>
+                
+                {/* 🔧 활성 모집공고가 있으면 모집 상태 표시 */}
+                {activeRecruitment && (
+                  <div className="my-2">
+                    <div 
+                      className="px-3 py-1 rounded-lg inline-block"
+                      style={{ 
+                        backgroundColor: activeRecruitment.status === 'RECRUITING' ? colors.primary : 
+                                          activeRecruitment.status === 'ALWAYS_RECRUITING' ? colors.tertiary : colors.lightGray,
+                      }}
+                    >
+                      <CustomText 
+                        font="pretendard-400"
+                        className="text-xs"
+                        style={{ 
+                          color: activeRecruitment.status === 'COMPLETED' ? colors.mediumGray : colors.white,
+                          margin: 0,
+                        }}
+                      >
+                        {activeRecruitment.status === 'RECRUITING' ? '모집중' : 
+                         activeRecruitment.status === 'ALWAYS_RECRUITING' ? '상시모집' : '모집종료'}
+                      </CustomText>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -278,119 +285,63 @@ const CentralClubDetail = () => {
               >
                 {activeTab === 'intro' ? '동아리 정보' : '모집 요강'}
               </CustomText>
-              <ClubInfoBoard club={club} 
-                style={activeTab === 'intro' ? 'introduce' : 'recruit'} />
               
-              {/* 🔧 동아리 소개 표시 (S3 이미지 지원 HTML 렌더링) */}
-              {activeTab === 'intro' && club.description && (
-                <div className="mt-6">
-                  <CustomText 
-                    font="pretendard-700"
-                    className="text-lg mb-4"
-                    style={{ color: colors.black }}
-                  >
-                    동아리 소개
-                  </CustomText>
-                  <div className="bg-white rounded-lg border border-gray-200 p-6">
-                    {/* 🔧 향상된 S3 이미지 렌더러 사용 */}
-                    <S3HtmlRenderer 
-                      htmlContent={club.description}
-                      className="prose prose-lg max-w-none leading-relaxed"
-                    />
-                    
-                    {/* 🔧 추가 스타일링 */}
-                    <style jsx>{`
-                      :global(.prose h1) {
-                        font-size: 2em;
-                        font-weight: bold;
-                        margin: 0.67em 0;
-                        color: ${colors.black};
-                      }
-                      
-                      :global(.prose h2) {
-                        font-size: 1.5em;
-                        font-weight: bold;
-                        margin: 0.75em 0;
-                        color: ${colors.black};
-                      }
-                      
-                      :global(.prose h3) {
-                        font-size: 1.17em;
-                        font-weight: bold;
-                        margin: 0.83em 0;
-                        color: ${colors.black};
-                      }
-                      
-                      :global(.prose p) {
-                        margin: 1em 0;
-                        line-height: 1.6;
-                        color: ${colors.black};
-                      }
-                      
-                      :global(.prose strong) {
-                        font-weight: 600;
-                      }
-                      
-                      :global(.prose em) {
-                        font-style: italic;
-                      }
-                      
-                      :global(.prose code) {
-                        background-color: #f3f4f6;
-                        padding: 2px 6px;
-                        border-radius: 4px;
-                        font-size: 0.875em;
-                        font-family: 'Monaco', 'Menlo', monospace;
-                      }
-                      
-                      :global(.prose blockquote) {
-                        border-left: 4px solid #d1d5db;
-                        padding-left: 1rem;
-                        margin: 1em 0;
-                        font-style: italic;
-                        color: ${colors.darkGray};
-                      }
-                      
-                      :global(.prose ul) {
-                        list-style-type: disc;
-                        list-style-position: inside;
-                        margin: 1em 0;
-                        padding-left: 1em;
-                      }
-                      
-                      :global(.prose ol) {
-                        list-style-type: decimal;
-                        list-style-position: inside;
-                        margin: 1em 0;
-                        padding-left: 1em;
-                      }
-                      
-                      :global(.prose li) {
-                        margin: 0.5em 0;
-                        line-height: 1.6;
-                        color: ${colors.black};
-                      }
-                      
-                      :global(.prose a) {
-                        color: #2563eb;
-                        text-decoration: underline;
-                      }
-                      
-                      :global(.prose a:hover) {
-                        color: #1d4ed8;
-                      }
-                      
-                      :global(.prose img) {
-                        max-width: 100%;
-                        height: auto;
-                        margin: 1em 0;
-                        border-radius: 8px;
-                        display: block;
-                        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-                      }
-                    `}</style>
+              {/* 🔧 탭에 따른 정보 보드 표시 */}
+              {activeTab === 'intro' ? (
+                <ClubInfoBoard club={club} style="introduce" />
+              ) : (
+                <RecruitmentInfoBoard recruitment={activeRecruitment} />
+              )}
+              
+              {/* 🔧 내용 표시 (동아리 소개 또는 모집 상세 정보) */}
+              {activeTab === 'intro' ? (
+                // 동아리 소개
+                club.description && (
+                  <div className="mt-6">
+                    <CustomText 
+                      font="pretendard-700"
+                      className="text-lg mb-4"
+                      style={{ color: colors.black }}
+                    >
+                      동아리 소개
+                    </CustomText>
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <S3HtmlRenderer 
+                        htmlContent={club.description}
+                        className="prose prose-lg max-w-none leading-relaxed"
+                      />
+                    </div>
                   </div>
-                </div>
+                )
+              ) : (
+                // 모집 상세 정보
+                activeRecruitment && (
+                  <div className="mt-6">
+                    <CustomText 
+                      font="pretendard-700"
+                      className="text-lg mb-4"
+                      style={{ color: colors.black }}
+                    >
+                      모집 상세 정보
+                    </CustomText>
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      {activeRecruitment.content ? (
+                        <S3HtmlRenderer 
+                          htmlContent={activeRecruitment.content}
+                          className="prose prose-lg max-w-none leading-relaxed"
+                        />
+                      ) : (
+                        <CustomText 
+                          font="pretendard-500"
+                          className="text-base"
+                          style={{ color: colors.darkGray }}
+                        >
+                          등록된 모집 상세 정보가 없습니다.
+                        </CustomText>
+                      )}
+                    </div>
+                  </div>
+                )
               )}
             </div>
           </div>
