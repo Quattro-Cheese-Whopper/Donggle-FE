@@ -111,9 +111,6 @@ const ClubInfoBoard = ({ club, style = "introduce" }) => {
       />
     );
   }
-  else {
-
-  }
 };
 
 export { InfoItem, WebsiteItem, InfoBoard, ClubInfoBoard };

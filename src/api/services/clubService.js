@@ -24,10 +24,14 @@ export const clubService = {
     }
   },
 
-  // 동아리 카테고리별 조회
+  // 동아리 카테고리별 조회 - 한글 카테고리 URL 인코딩
   getClubsByCategory: async (category, params = {}) => {
     try {
-      const response = await apiClient.get(`/clubs/category/${category}`, params);
+      // 한글 카테고리를 URL 인코딩
+      const encodedCategory = encodeURIComponent(category);
+      console.log(`🔍 카테고리 API 호출: ${category} → ${encodedCategory}`);
+      
+      const response = await apiClient.get(`/clubs/category/${encodedCategory}`, params);
       return response;
     } catch (error) {
       console.error('카테고리별 동아리 조회 실패:', error);
