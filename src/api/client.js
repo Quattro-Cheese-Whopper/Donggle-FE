@@ -1,4 +1,4 @@
-// src/api/client.js - 토큰 만료 500 에러 처리 추가
+// src/api/client.js - 정교한 토큰 리프레시 로직
 import { apiConfig } from './config';
 import { tokenManager } from '../utils/tokenManager';
 
@@ -42,7 +42,6 @@ class ApiClient {
       ...options
     };
 
-    // 🔍 디버깅: 요청 정보 로그
     console.log('🔄 API 요청:', {
       url,
       method: config.method || 'GET',
@@ -61,38 +60,36 @@ class ApiClient {
       
       clearTimeout(timeoutId);
 
-      // 🔍 디버깅: 응답 정보 로그
       console.log('📥 API 응답:', {
         status: response.status,
         statusText: response.statusText,
         headers: Object.fromEntries(response.headers.entries())
       });
 
-      // 401 인증 오류 처리
+      // 🔧 401 에러 처리 - 토큰이 있고 인증이 필요한 엔드포인트에서만 리프레시 시도
       if (response.status === 401 && !endpoint.includes('/auth/')) {
-        return this.handleTokenRefresh(url, config);
+        return this.handleAuthError(url, config, '401 인증 실패');
       }
 
       if (!response.ok) {
-        // 🔍 에러 응답 본문 확인
         let errorBody;
         let errorJson = null;
         try {
           errorBody = await response.text();
           console.error('❌ 에러 응답 본문:', errorBody);
           
-          // JSON 파싱 시도
           try {
             errorJson = JSON.parse(errorBody);
             console.error('❌ 에러 JSON:', errorJson);
             
-            // 🔧 500 에러이지만 토큰 만료 메시지인 경우 토큰 리프레시 시도
+            // 🔧 500 에러에서 토큰 만료 메시지인 경우만 리프레시 시도
             if (response.status === 500 && 
                 errorJson.message && 
                 errorJson.message.includes('Token is expired') &&
                 !endpoint.includes('/auth/')) {
-              console.log('🔄 500 에러이지만 토큰 만료로 판단, 토큰 리프레시 시도');
-              return this.handleTokenRefresh(url, config);
+              
+              console.log('🔄 500 에러에서 토큰 만료 메시지 감지');
+              return this.handleAuthError(url, config, '토큰 만료');
             }
           } catch (e) {
             console.error('❌ 에러 응답이 JSON이 아님');
@@ -114,6 +111,44 @@ class ApiClient {
     }
   }
 
+  // 🔧 인증 에러 처리 통합 함수
+  async handleAuthError(originalUrl, originalConfig, reason) {
+    const hasAccessToken = !!tokenManager.getAccessToken();
+    const hasRefreshToken = !!tokenManager.getRefreshToken();
+    
+    console.log('🔍 토큰 상태 확인:', {
+      hasAccessToken,
+      hasRefreshToken,
+      reason
+    });
+
+    // 1. 토큰이 있고 리프레시 토큰도 있는 경우 -> 토큰 리프레시 시도
+    if (hasAccessToken && hasRefreshToken) {
+      console.log('🔄 토큰이 존재하므로 리프레시 시도');
+      try {
+        return await this.handleTokenRefresh(originalUrl, originalConfig);
+      } catch (refreshError) {
+        console.error('❌ 토큰 리프레시 실패:', refreshError);
+        // 리프레시 실패 시 토큰 정리하고 로그인으로 리다이렉트
+        tokenManager.clearTokens();
+        console.log('➡️ 토큰 리프레시 실패로 로그인 페이지로 리다이렉트');
+        window.location.href = '/signin';
+        throw refreshError;
+      }
+    }
+    
+    // 2. 토큰이 없거나 리프레시 토큰이 없는 경우
+    if (!hasAccessToken) {
+      console.log('⚠️ 액세스 토큰이 없음 - 리프레시하지 않음');
+    } else if (!hasRefreshToken) {
+      console.log('⚠️ 리프레시 토큰이 없음 - 리프레시 불가능');
+      tokenManager.clearTokens(); // 불완전한 토큰 상태 정리
+    }
+    
+    // 토큰이 없는 상태에서는 리다이렉트하지 않고 에러만 throw
+    throw new Error(`인증이 필요합니다. ${reason}`);
+  }
+
   async handleTokenRefresh(originalUrl, originalConfig) {
     if (this.isRefreshing) {
       return new Promise((resolve, reject) => {
@@ -131,6 +166,13 @@ class ApiClient {
 
     try {
       console.log('🔄 토큰 리프레시 시도...');
+      
+      // 리프레시 토큰 재확인
+      const refreshToken = tokenManager.getRefreshToken();
+      if (!refreshToken) {
+        throw new Error('리프레시 토큰이 없습니다.');
+      }
+      
       const { authService } = await import('./services/authService');
       await authService.refreshToken();
       
@@ -152,10 +194,6 @@ class ApiClient {
     } catch (error) {
       console.error('❌ 토큰 리프레시 실패:', error);
       this.processQueue(error, null);
-      
-      // 토큰 리프레시 실패시 로그인 페이지로 리다이렉트
-      console.log('➡️ 로그인 페이지로 리다이렉트');
-      window.location.href = '/signin';
       throw error;
     } finally {
       this.isRefreshing = false;
