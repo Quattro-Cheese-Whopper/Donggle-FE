@@ -4,60 +4,6 @@ import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 import { InfoBoard } from './ClubInfo';
 
-// 모집 상태 배지 컴포넌트
-const RecruitmentStatusBadge = ({ status }) => {
-  const getStatusInfo = (status) => {
-    switch (status) {
-      case 'RECRUITING':
-        return {
-          text: '모집중',
-          bgColor: colors.primary,
-          textColor: colors.white
-        };
-      case 'COMPLETED':
-        return {
-          text: '모집종료',
-          bgColor: colors.lightGray,
-          textColor: colors.mediumGray
-        };
-      case 'ALWAYS_RECRUITING':
-        return {
-          text: '상시모집',
-          bgColor: colors.tertiary,
-          textColor: colors.white
-        };
-      default:
-        return {
-          text: '상태미정',
-          bgColor: colors.lightGray,
-          textColor: colors.mediumGray
-        };
-    }
-  };
-
-  const statusInfo = getStatusInfo(status);
-
-  return (
-    <div 
-      className="px-3 py-1 rounded-lg inline-block"
-      style={{ 
-        backgroundColor: statusInfo.bgColor,
-      }}
-    >
-      <CustomText 
-        font="pretendard-400"
-        className="text-xs"
-        style={{ 
-          color: statusInfo.textColor,
-          margin: 0,
-        }}
-      >
-        {statusInfo.text}
-      </CustomText>
-    </div>
-  );
-};
-
 // 날짜 포맷 함수
 const formatDate = (dateString) => {
   if (!dateString) return '';

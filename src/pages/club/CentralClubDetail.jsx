@@ -264,7 +264,7 @@ const CentralClubDetail = () => {
                       className="px-3 py-1 rounded-lg inline-block"
                       style={{ 
                         backgroundColor: activeRecruitment.status === 'RECRUITING' ? colors.primary : 
-                                          activeRecruitment.status === 'ALWAYS_RECRUITING' ? colors.tertiary : colors.lightGray,
+                                          activeRecruitment.status === 'ALWAYS_RECRUITING' ? colors.lightBlue : colors.lightGray,
                       }}
                     >
                       <CustomText 

@@ -5,9 +5,39 @@ import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 import { useClubImage } from '../../hooks/useClubImage';
 
-const ClubCard = ({ id, profileImageName, name, description, category, isRecruiting }) => {
+// 🔧 모집 상태에 따른 배지 정보를 반환하는 헬퍼 함수
+const getRecruitmentBadgeInfo = (latestRecruitmentStatus) => {
+  switch (latestRecruitmentStatus) {
+    case 'RECRUITING':
+      return {
+        text: '모집중',
+        bgColor: colors.primary,
+        textColor: colors.white
+      };
+    case 'ALWAYS_RECRUITING':
+      return {
+        text: '상시모집',
+        bgColor: colors.lightBlue,
+        textColor: colors.white
+      };
+    case null:
+    case 'COMPLETED':
+    default:
+      return {
+        text: '모집종료',
+        bgColor: colors.lightGray,
+        textColor: colors.mediumGray
+      };
+  }
+};
+
+const ClubCard = ({ id, profileImageName, name, description, category, latestRecruitmentStatus, isRecruiting }) => {
   const navigate = useNavigate();
   const { imageUrl, loading, error } = useClubImage(profileImageName);
+
+  // 🔧 latestRecruitmentStatus 우선, fallback으로 isRecruiting 사용
+  const recruitmentStatus = latestRecruitmentStatus !== undefined ? latestRecruitmentStatus : (isRecruiting ? 'RECRUITING' : 'COMPLETED');
+  const badgeInfo = getRecruitmentBadgeInfo(recruitmentStatus);
 
   // 카드 클릭 핸들러
   const handleCardClick = () => {
@@ -73,23 +103,23 @@ const ClubCard = ({ id, profileImageName, name, description, category, isRecruit
         </CustomText>
       </div>
       
-      {/* 모집 상태 배지 */}
+      {/* 🔧 latestRecruitmentStatus 기반 모집 상태 배지 */}
       <div className="absolute bottom-4 right-4">
         <div 
           className="px-3 py-1 rounded-lg inline-block"
           style={{ 
-            backgroundColor: isRecruiting ? colors.primary : colors.lightGray,
+            backgroundColor: badgeInfo.bgColor,
           }}
         >
           <CustomText 
             font="pretendard-400"
             className="text-xs"
             style={{ 
-              color: isRecruiting ? colors.white : colors.mediumGray,
+              color: badgeInfo.textColor,
               margin: 0,
             }}
           >
-            {isRecruiting ? '모집중' : '모집종료'}
+            {badgeInfo.text}
           </CustomText>
         </div>
       </div>
@@ -108,7 +138,8 @@ const ClubCardGrid = ({ clubs }) => {
           name={club.name}
           description={club.description}
           category={club.category}
-          isRecruiting={club.isRecruiting}
+          latestRecruitmentStatus={club.latestRecruitmentStatus}
+          isRecruiting={club.isRecruiting} // 🔧 fallback용으로 유지
         />
       ))}
     </div>
@@ -165,7 +196,8 @@ const HorizontalClubCarousel = ({ clubs }) => {
               name={club.name}
               description={club.description}
               category={club.category}
-              isRecruiting={club.isRecruiting}
+              latestRecruitmentStatus={club.latestRecruitmentStatus}
+              isRecruiting={club.isRecruiting} // 🔧 fallback용으로 유지
             />
           </div>
         ))}
