@@ -195,10 +195,20 @@ const CentralClubEdit = () => {
   };
 
   const handleRecruitmentInputChange = (field, value) => {
-    setRecruitmentFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setRecruitmentFormData(prev => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
+      
+      // 🔧 상시모집으로 변경시 날짜 필드 초기화
+      if (field === 'status' && value === 'ALWAYS_RECRUITING') {
+        updated.startDate = '';
+        updated.endDate = '';
+      }
+      
+      return updated;
+    });
   };
 
   // 🔧 동아리 소개 에디터로부터 getProcessedContent 함수를 받는 콜백
@@ -585,8 +595,16 @@ const CentralClubEdit = () => {
                             type="date"
                             value={recruitmentFormData.startDate}
                             onChange={(e) => handleRecruitmentInputChange('startDate', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              recruitmentFormData.status === 'ALWAYS_RECRUITING' ? 'bg-gray-100 cursor-not-allowed' : ''
+                            }`}
+                            disabled={recruitmentFormData.status === 'ALWAYS_RECRUITING'}
                           />
+                          {recruitmentFormData.status === 'ALWAYS_RECRUITING' && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              상시모집에서는 날짜를 설정할 수 없습니다
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -597,8 +615,16 @@ const CentralClubEdit = () => {
                             type="date"
                             value={recruitmentFormData.endDate}
                             onChange={(e) => handleRecruitmentInputChange('endDate', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              recruitmentFormData.status === 'ALWAYS_RECRUITING' ? 'bg-gray-100 cursor-not-allowed' : ''
+                            }`}
+                            disabled={recruitmentFormData.status === 'ALWAYS_RECRUITING'}
                           />
+                          {recruitmentFormData.status === 'ALWAYS_RECRUITING' && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              상시모집에서는 날짜를 설정할 수 없습니다
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -701,8 +727,16 @@ const CentralClubEdit = () => {
                             type="date"
                             value={recruitmentFormData.startDate}
                             onChange={(e) => handleRecruitmentInputChange('startDate', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              recruitmentFormData.status === 'ALWAYS_RECRUITING' ? 'bg-gray-100 cursor-not-allowed' : ''
+                            }`}
+                            disabled={recruitmentFormData.status === 'ALWAYS_RECRUITING'}
                           />
+                          {recruitmentFormData.status === 'ALWAYS_RECRUITING' && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              상시모집에서는 날짜를 설정할 수 없습니다
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -713,8 +747,16 @@ const CentralClubEdit = () => {
                             type="date"
                             value={recruitmentFormData.endDate}
                             onChange={(e) => handleRecruitmentInputChange('endDate', e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                              recruitmentFormData.status === 'ALWAYS_RECRUITING' ? 'bg-gray-100 cursor-not-allowed' : ''
+                            }`}
+                            disabled={recruitmentFormData.status === 'ALWAYS_RECRUITING'}
                           />
+                          {recruitmentFormData.status === 'ALWAYS_RECRUITING' && (
+                            <p className="text-xs text-gray-500 mt-1">
+                              상시모집에서는 날짜를 설정할 수 없습니다
+                            </p>
+                          )}
                         </div>
                         
                         <div>
