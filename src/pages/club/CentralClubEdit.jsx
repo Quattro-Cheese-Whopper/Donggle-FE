@@ -21,6 +21,7 @@ const CentralClubEdit = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('intro');
   const [hasFetchedData, setHasFetchedData] = useState(false);
+  const [hasRecruitments, setHasRecruitments] = useState(true); // 🔧 모집공고 존재 여부
   
   // 🔧 WYSIWYG 에디터에서 getProcessedContent 함수를 받을 ref들
   const getProcessedContentRef = useRef(null); // 동아리 소개용
@@ -77,7 +78,7 @@ const CentralClubEdit = () => {
     setActiveTab(tab);
   };
 
-  // 🔧 모집공고 데이터를 통해 동아리와 모집 정보를 한번에 가져오기
+  // 🔧 동아리 정보를 먼저 모집공고로 시도하고, 실패하면 동아리 API로 fallback
   const fetchClubAndRecruitmentData = useCallback(async () => {
     if (hasFetchedData) {
       return;
@@ -88,48 +89,56 @@ const CentralClubEdit = () => {
       setError(null);
       setHasFetchedData(true);
       
-      console.log(`🔍 편집용 동아리 모집공고 조회: ${clubId}`);
+      console.log(`🔍 편집용 동아리 모집공고 조회 시도: ${clubId}`);
       
-      const response = await recruitmentService.getClubRecruitments(clubId);
-      const recruitmentData = response.data || response || [];
-      
-      console.log('✅ 편집용 모집공고 데이터:', recruitmentData);
-      
-      if (recruitmentData.length > 0) {
-        // 첫 번째 모집공고에서 동아리 정보 추출
-        const clubData = recruitmentData[0].club;
-        setClub(clubData);
-        setClubFormData({
-          name: clubData.name || '',
-          memberCount: clubData.memberCount || 0,
-          location: clubData.location || '',
-          contactInfo: clubData.contactInfo || '',
-          description: clubData.description || ''
-        });
+      try {
+        // 1단계: 모집공고 API로 동아리 정보 조회 시도
+        const response = await recruitmentService.getClubRecruitments(clubId);
+        const recruitmentData = response.data || response || [];
         
-        // 모집공고 목록 설정
-        setRecruitments(recruitmentData);
+        console.log('✅ 편집용 모집공고 데이터:', recruitmentData);
         
-        // 활성 모집공고 찾기 (RECRUITING 상태 우선, 없으면 첫 번째)
-        const activeRecruitment = recruitmentData.find(r => r.status === 'RECRUITING') || recruitmentData[0];
-        setActiveRecruitment(activeRecruitment);
+        if (recruitmentData.length > 0) {
+          // 모집공고가 있는 경우 - 기존 로직
+          const clubData = recruitmentData[0].club;
+          setClub(clubData);
+          setClubFormData({
+            name: clubData.name || '',
+            memberCount: clubData.memberCount || 0,
+            location: clubData.location || '',
+            contactInfo: clubData.contactInfo || '',
+            description: clubData.description || ''
+          });
+          
+          // 모집공고 목록 설정
+          setRecruitments(recruitmentData);
+          setHasRecruitments(true);
+          
+          // 활성 모집공고 찾기 (RECRUITING 상태 우선, 없으면 첫 번째)
+          const activeRecruitment = recruitmentData.find(r => r.status === 'RECRUITING') || recruitmentData[0];
+          setActiveRecruitment(activeRecruitment);
+          
+          // 모집공고 폼 데이터 설정
+          setRecruitmentFormData({
+            title: activeRecruitment?.title || '',
+            content: activeRecruitment?.content || '',
+            recruitCount: activeRecruitment?.recruitCount || 0,
+            startDate: formatDateForInput(activeRecruitment?.startDate),
+            endDate: formatDateForInput(activeRecruitment?.endDate),
+            status: activeRecruitment?.status || 'RECRUITING',
+            contactInfo: activeRecruitment?.contactInfo || ''
+          });
+          
+          console.log('✅ 편집용 동아리 정보 (모집공고 포함):', clubData);
+          console.log('✅ 편집용 활성 모집공고:', activeRecruitment);
+        } else {
+          // 🔧 모집공고는 없지만 API 호출은 성공한 경우
+          throw new Error('NO_RECRUITMENTS');
+        }
+      } catch (recruitmentError) {
+        // 2단계: 모집공고 조회 실패 시 동아리 정보만 조회
+        console.log('📝 편집용 모집공고 조회 실패, 동아리 정보만 조회:', recruitmentError.message);
         
-        // 모집공고 폼 데이터 설정
-        setRecruitmentFormData({
-          title: activeRecruitment?.title || '',
-          content: activeRecruitment?.content || '',
-          recruitCount: activeRecruitment?.recruitCount || 0,
-          startDate: formatDateForInput(activeRecruitment?.startDate),
-          endDate: formatDateForInput(activeRecruitment?.endDate),
-          status: activeRecruitment?.status || 'RECRUITING',
-          contactInfo: activeRecruitment?.contactInfo || ''
-        });
-        
-        console.log('✅ 편집용 동아리 정보:', clubData);
-        console.log('✅ 편집용 활성 모집공고:', activeRecruitment);
-      } else {
-        // 모집공고가 없는 경우 기본 clubService로 동아리 정보만 가져오기
-        console.log('📝 모집공고가 없어서 동아리 정보만 조회');
         const clubResponse = await clubService.getClubDetail(clubId);
         const clubData = clubResponse.data || clubResponse;
         
@@ -145,6 +154,9 @@ const CentralClubEdit = () => {
         // 모집공고는 빈 배열로 설정
         setRecruitments([]);
         setActiveRecruitment(null);
+        setHasRecruitments(false);
+        
+        console.log('✅ 편집용 동아리 정보 (모집공고 없음):', clubData);
       }
     } catch (err) {
       console.error('❌ 편집용 데이터 조회 실패:', err);
@@ -172,6 +184,7 @@ const CentralClubEdit = () => {
     setRecruitments([]);
     setActiveRecruitment(null);
     setError(null);
+    setHasRecruitments(true);
   }, [clubId]);
 
   const handleClubInputChange = (field, value) => {
@@ -252,17 +265,11 @@ const CentralClubEdit = () => {
     }
   };
 
-  // 🔧 모집공고 저장
+  // 🔧 모집공고 저장 (기존 수정 또는 신규 생성)
   const handleRecruitmentSave = async () => {
     setSaving(true);
     try {
-      console.log('💾 모집공고 정보 업데이트 시작:', recruitmentFormData);
-      
-      if (!activeRecruitment || !activeRecruitment.id) {
-        alert('수정할 모집공고가 없습니다.');
-        setSaving(false);
-        return;
-      }
+      console.log('💾 모집공고 정보 업데이트/생성 시작:', recruitmentFormData);
 
       // 🔧 WYSIWYG 에디터에서 처리된 콘텐츠 가져오기 (Base64 이미지 → S3 변환)
       let processedContent = recruitmentFormData.content;
@@ -274,7 +281,7 @@ const CentralClubEdit = () => {
       }
       
       // API 요청 형식에 맞게 데이터 변환
-      const updateData = {
+      const requestData = {
         title: recruitmentFormData.title,
         content: processedContent, // 🔧 처리된 설명 사용
         recruitCount: recruitmentFormData.recruitCount,
@@ -284,18 +291,30 @@ const CentralClubEdit = () => {
         contactInfo: recruitmentFormData.contactInfo
       };
       
-      console.log('📤 서버로 전송할 모집공고 데이터:', updateData);
+      console.log('📤 서버로 전송할 모집공고 데이터:', requestData);
       
-      // API 호출로 모집공고 정보 업데이트
-      await recruitmentService.updateRecruitment(activeRecruitment.id, updateData);
-      
-      console.log('✅ 모집공고 정보 업데이트 성공');
+      if (hasRecruitments && activeRecruitment?.id) {
+        // 🔧 기존 모집공고 수정
+        console.log('✏️ 기존 모집공고 수정:', activeRecruitment.id);
+        await recruitmentService.updateRecruitment(activeRecruitment.id, requestData);
+        console.log('✅ 모집공고 수정 성공');
+      } else {
+        // 🔧 새 모집공고 생성
+        console.log('➕ 새 모집공고 생성 for clubId:', clubId);
+        const response = await recruitmentService.createRecruitmentForClub(clubId, requestData);
+        console.log('✅ 모집공고 생성 성공:', response);
+        
+        // 생성 후 상태 업데이트
+        setHasRecruitments(true);
+        setActiveRecruitment(response.data || response);
+        setRecruitments([response.data || response]);
+      }
       
       // 성공 후 상세 페이지로 돌아가기
       navigate(`/club/central/${clubId}`);
       
     } catch (error) {
-      console.error('❌ 모집공고 정보 업데이트 실패:', error);
+      console.error('❌ 모집공고 정보 저장 실패:', error);
       alert('저장에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setSaving(false);
@@ -419,7 +438,7 @@ const CentralClubEdit = () => {
       <main className="flex-grow flex justify-center">
         <div className="max-w-screen-lg w-full pb-24 sm:px-6 lg:px-8">
           <div className="px-4">
-            {/* 🔧 탭 추가 */}
+            {/* 🔧 탭 추가 - 모집공고가 없으면 신입모집 탭 비활성화 */}
             <ClubTabs 
               activeTab={activeTab}
               onTabChange={handleTabChange}
@@ -516,8 +535,9 @@ const CentralClubEdit = () => {
                   </div>
                 </div>
               ) : (
-                // 🔧 신입 모집 편집 - 동일한 구조
-                activeRecruitment ? (
+                // 🔧 신입 모집 편집 - 모집공고 여부에 따라 분기
+                hasRecruitments && activeRecruitment ? (
+                  // 기존 모집공고 수정
                   <div className="space-y-6">
                     {/* 기본 정보 편집 */}
                     <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -633,34 +653,126 @@ const CentralClubEdit = () => {
                     </div>
                   </div>
                 ) : (
-                  // 모집공고가 없는 경우
-                  <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                    <CustomText 
-                      font="pretendard-600"
-                      className="text-lg mb-4"
-                      style={{ color: colors.black }}
-                    >
-                      등록된 모집공고가 없습니다
-                    </CustomText>
-                    <CustomText 
-                      font="pretendard-500"
-                      className="text-base mb-6"
-                      style={{ color: colors.darkGray }}
-                    >
-                      먼저 모집공고를 생성해주세요.
-                    </CustomText>
-                    <button 
-                      onClick={handleCancel}
-                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                    >
-                      돌아가기
-                    </button>
+                  // 🔧 새 모집공고 작성 폼
+                  <div className="space-y-6">
+                    {/* 기본 정보 편집 */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <CustomText 
+                        font="pretendard-700"
+                        className="text-lg mb-4"
+                        style={{ color: colors.black }}
+                      >
+                        기본 정보
+                      </CustomText>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집분야
+                          </label>
+                          <input
+                            type="text"
+                            value={recruitmentFormData.title}
+                            onChange={(e) => handleRecruitmentInputChange('title', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="예: FE, BE, AI, GAME, PM, DE"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집인원
+                          </label>
+                          <input
+                            type="number"
+                            value={recruitmentFormData.recruitCount}
+                            onChange={(e) => handleRecruitmentInputChange('recruitCount', parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            min="0"
+                            placeholder="0 (0이면 '인원 미정'으로 표시)"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집 시작일
+                          </label>
+                          <input
+                            type="date"
+                            value={recruitmentFormData.startDate}
+                            onChange={(e) => handleRecruitmentInputChange('startDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집 마감일
+                          </label>
+                          <input
+                            type="date"
+                            value={recruitmentFormData.endDate}
+                            onChange={(e) => handleRecruitmentInputChange('endDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            모집상태
+                          </label>
+                          <select
+                            value={recruitmentFormData.status}
+                            onChange={(e) => handleRecruitmentInputChange('status', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            <option value="RECRUITING">모집중</option>
+                            <option value="ALWAYS_RECRUITING">상시모집</option>
+                            <option value="COMPLETED">모집종료</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
+                            관련링크
+                          </label>
+                          <input
+                            type="url"
+                            value={recruitmentFormData.contactInfo}
+                            onChange={(e) => handleRecruitmentInputChange('contactInfo', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="https://recruit.example.com"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 상세 소개 WYSIWYG 에디터 */}
+                    <div className="bg-white rounded-lg border border-gray-200 p-6">
+                      <CustomText 
+                        font="pretendard-700"
+                        className="text-lg mb-4"
+                        style={{ color: colors.black }}
+                      >
+                        상세 소개
+                      </CustomText>
+                      
+                      <div className="mt-4">
+                        <WYSIWYGEditor
+                          content={recruitmentFormData.content}
+                          onChange={(content) => handleRecruitmentInputChange('content', content)}
+                          placeholder="모집에 대한 상세한 정보를 작성해주세요..."
+                          clubId={clubId}
+                          onGetProcessedContent={handleGetRecruitmentProcessedContent}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )
               )}
 
-              {/* 🔧 공통 저장/취소 버튼 - 모집공고가 있을 때만 표시 */}
-              {(activeTab === 'intro' || (activeTab === 'recruit' && activeRecruitment)) && (
+              {/* 🔧 공통 저장/취소 버튼 - 동아리 소개 탭이거나 신입모집 탭(모집공고 작성/수정 가능)일 때 표시 */}
+              {(activeTab === 'intro' || activeTab === 'recruit') && (
                 <div className="flex justify-end space-x-3 mt-6">
                   <button 
                     onClick={handleCancel}
@@ -680,7 +792,7 @@ const CentralClubEdit = () => {
                         저장 중...
                       </>
                     ) : (
-                      '저장'
+                      activeTab === 'recruit' && !hasRecruitments ? '모집공고 생성' : '저장'
                     )}
                   </button>
                 </div>

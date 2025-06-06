@@ -11,6 +11,7 @@ import S3HtmlRenderer from '../../components/editor/S3HtmlRenderer';
 import { useAuth } from '../../hooks/useAuth';
 import { useClubImage } from '../../hooks/useClubImage';
 import { recruitmentService } from '../../api/services/recruitmentService';
+import { clubService } from '../../api/services/clubService';
 
 const CentralClubDetail = () => {
   const { clubId } = useParams();
@@ -23,6 +24,7 @@ const CentralClubDetail = () => {
   const [activeTab, setActiveTab] = useState('intro');
   const [hasFetchedData, setHasFetchedData] = useState(false);
   const [hasFetchedMyClubs, setHasFetchedMyClubs] = useState(false);
+  const [hasRecruitments, setHasRecruitments] = useState(true); // 🔧 모집공고 존재 여부
 
   const { isLoggedIn, isMyClub, fetchMyClubs, myClubs } = useAuth();
   
@@ -38,7 +40,7 @@ const CentralClubDetail = () => {
     navigate(`/club/central/${clubId}/edit`);
   };
 
-  // 🔧 모집공고 데이터를 통해 동아리와 모집 정보를 한번에 가져오기
+  // 🔧 동아리 정보를 먼저 모집공고로 시도하고, 실패하면 동아리 API로 fallback
   const fetchClubAndRecruitmentData = useCallback(async () => {
     if (hasFetchedData) {
       console.log(`⏭️ 이미 데이터를 가져왔음, 스킵`);
@@ -50,35 +52,49 @@ const CentralClubDetail = () => {
       setError(null);
       setHasFetchedData(true);
       
-      console.log(`🔍 동아리 모집공고 조회: ${clubId}`);
+      console.log(`🔍 동아리 모집공고 조회 시도: ${clubId}`);
       
-      const response = await recruitmentService.getClubRecruitments(clubId);
-      const recruitmentData = response.data || response || [];
-      
-      console.log('✅ 모집공고 데이터:', recruitmentData);
-      
-      if (recruitmentData.length > 0) {
-        // 첫 번째 모집공고에서 동아리 정보 추출
-        const clubData = recruitmentData[0].club;
+      try {
+        // 1단계: 모집공고 API로 동아리 정보 조회 시도
+        const response = await recruitmentService.getClubRecruitments(clubId);
+        const recruitmentData = response.data || response || [];
+        
+        console.log('✅ 모집공고 데이터:', recruitmentData);
+        
+        if (recruitmentData.length > 0) {
+          // 모집공고가 있는 경우 - 기존 로직
+          const clubData = recruitmentData[0].club;
+          setClub(clubData);
+          setRecruitments(recruitmentData);
+          setHasRecruitments(true);
+          
+          // 활성 모집공고 찾기 (RECRUITING 상태 우선, 없으면 첫 번째)
+          const activeRecruitment = recruitmentData.find(r => r.status === 'RECRUITING') || recruitmentData[0];
+          setActiveRecruitment(activeRecruitment);
+          
+          console.log('✅ 동아리 정보 (모집공고 포함):', clubData);
+          console.log('✅ 활성 모집공고:', activeRecruitment);
+        } else {
+          // 🔧 모집공고는 없지만 API 호출은 성공한 경우
+          throw new Error('NO_RECRUITMENTS');
+        }
+      } catch (recruitmentError) {
+        // 2단계: 모집공고 조회 실패 시 동아리 정보만 조회
+        console.log('📝 모집공고 조회 실패, 동아리 정보만 조회:', recruitmentError.message);
+        
+        const clubResponse = await clubService.getClubDetail(clubId);
+        const clubData = clubResponse.data || clubResponse;
+        
         setClub(clubData);
+        setRecruitments([]);
+        setActiveRecruitment(null);
+        setHasRecruitments(false);
         
-        // 모집공고 목록 설정
-        setRecruitments(recruitmentData);
-        
-        // 활성 모집공고 찾기 (RECRUITING 상태 우선, 없으면 첫 번째)
-        const activeRecruitment = recruitmentData.find(r => r.status === 'RECRUITING') || recruitmentData[0];
-        setActiveRecruitment(activeRecruitment);
-        
-        console.log('✅ 동아리 정보:', clubData);
-        console.log('✅ 활성 모집공고:', activeRecruitment);
-      } else {
-        // 모집공고가 없는 경우에도 동아리 정보를 가져와야 할 수 있음
-        // 이 경우 기존 clubService를 사용하거나 에러 처리
-        setError('등록된 모집공고가 없습니다.');
+        console.log('✅ 동아리 정보 (모집공고 없음):', clubData);
       }
     } catch (err) {
-      console.error('❌ 동아리 및 모집공고 조회 실패:', err);
-      setError(err.message || '데이터를 불러오는 중 오류가 발생했습니다.');
+      console.error('❌ 동아리 정보 조회 실패:', err);
+      setError(err.message || '동아리 정보를 불러오는 중 오류가 발생했습니다.');
       setHasFetchedData(false);
     } finally {
       setLoading(false);
@@ -125,6 +141,7 @@ const CentralClubDetail = () => {
     setRecruitments([]);
     setActiveRecruitment(null);
     setError(null);
+    setHasRecruitments(true);
   }, [clubId]);
 
   const handleGoBack = () => {
@@ -240,8 +257,8 @@ const CentralClubDetail = () => {
                   {club.category}
                 </CustomText>
                 
-                {/* 🔧 활성 모집공고가 있으면 모집 상태 표시 */}
-                {activeRecruitment && (
+                {/* 🔧 활성 모집공고가 있으면 모집 상태 표시, 없으면 표시 안함 */}
+                {hasRecruitments && activeRecruitment && (
                   <div className="my-2">
                     <div 
                       className="px-3 py-1 rounded-lg inline-block"
@@ -290,13 +307,26 @@ const CentralClubDetail = () => {
               {activeTab === 'intro' ? (
                 <ClubInfoBoard club={club} style="introduce" />
               ) : (
-                <RecruitmentInfoBoard recruitment={activeRecruitment} />
+                // 🔧 모집공고가 없는 경우 처리
+                hasRecruitments ? (
+                  <RecruitmentInfoBoard recruitment={activeRecruitment} />
+                ) : (
+                  <div className="rounded-lg border border-gray-200 bg-white py-8 px-7 text-center">
+                    <CustomText 
+                      font="pretendard-500"
+                      className="text-base"
+                      style={{ color: colors.darkGray }}
+                    >
+                      현재 진행 중인 모집공고가 작성되지 않았습니다.
+                    </CustomText>
+                  </div>
+                )
               )}
               
               {/* 🔧 내용 표시 (동아리 소개 또는 모집 상세 정보) */}
               {activeTab === 'intro' ? (
                 // 동아리 소개
-                club.description && (
+                club.description ? (
                   <div className="mt-6">
                     <CustomText 
                       font="pretendard-700"
@@ -312,10 +342,30 @@ const CentralClubDetail = () => {
                       />
                     </div>
                   </div>
+                ) : (
+                  // 🔧 동아리 소개가 없는 경우
+                  <div className="mt-6">
+                    <CustomText 
+                      font="pretendard-700"
+                      className="text-lg mb-4"
+                      style={{ color: colors.black }}
+                    >
+                      동아리 소개
+                    </CustomText>
+                    <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+                      <CustomText 
+                        font="pretendard-500"
+                        className="text-base"
+                        style={{ color: colors.darkGray }}
+                      >
+                        동아리 소개가 작성되지 않았습니다.
+                      </CustomText>
+                    </div>
+                  </div>
                 )
               ) : (
                 // 모집 상세 정보
-                activeRecruitment && (
+                hasRecruitments && activeRecruitment ? (
                   <div className="mt-6">
                     <CustomText 
                       font="pretendard-700"
@@ -333,12 +383,32 @@ const CentralClubDetail = () => {
                       ) : (
                         <CustomText 
                           font="pretendard-500"
-                          className="text-base"
+                          className="text-base text-center"
                           style={{ color: colors.darkGray }}
                         >
-                          등록된 모집 상세 정보가 없습니다.
+                          모집 상세 정보가 작성되지 않았습니다.
                         </CustomText>
                       )}
+                    </div>
+                  </div>
+                ) : (
+                  // 🔧 모집공고가 없는 경우
+                  <div className="mt-6">
+                    <CustomText 
+                      font="pretendard-700"
+                      className="text-lg mb-4"
+                      style={{ color: colors.black }}
+                    >
+                      모집 상세 정보
+                    </CustomText>
+                    <div className="bg-white rounded-lg border border-gray-200 p-6 text-center">
+                      <CustomText 
+                        font="pretendard-500"
+                        className="text-base"
+                        style={{ color: colors.darkGray }}
+                      >
+                        모집 상세 정보가 작성되지 않았습니다.
+                      </CustomText>
                     </div>
                   </div>
                 )

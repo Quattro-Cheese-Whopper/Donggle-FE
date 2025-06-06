@@ -24,7 +24,20 @@ export const recruitmentService = {
     }
   },
 
-  // 모집공고 생성
+  // 🔧 특정 동아리에 대한 모집공고 생성
+  createRecruitmentForClub: async (clubId, recruitmentData) => {
+    try {
+      console.log(`📝 동아리 ${clubId}에 대한 모집공고 생성:`, recruitmentData);
+      const response = await apiClient.post(`/recruitments/clubs/${clubId}`, recruitmentData);
+      console.log('✅ 모집공고 생성 성공:', response);
+      return response;
+    } catch (error) {
+      console.error('동아리 모집공고 생성 실패:', error);
+      throw error;
+    }
+  },
+
+  // 모집공고 생성 (기존 일반 생성 API)
   createRecruitment: async (recruitmentData) => {
     try {
       const response = await apiClient.post('/recruitments', recruitmentData);
