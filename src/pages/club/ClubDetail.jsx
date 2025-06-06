@@ -13,8 +13,8 @@ import { useClubImage } from '../../hooks/useClubImage';
 import { recruitmentService } from '../../api/services/recruitmentService';
 import { clubService } from '../../api/services/clubService';
 
-const CentralClubDetail = () => {
-  const { clubId } = useParams();
+const ClubDetail = () => {
+  const { clubType, clubId } = useParams(); // 🔧 clubType과 clubId 모두 받기
   const navigate = useNavigate();
   const [club, setClub] = useState(null);
   const [recruitments, setRecruitments] = useState([]);
@@ -24,12 +24,17 @@ const CentralClubDetail = () => {
   const [activeTab, setActiveTab] = useState('intro');
   const [hasFetchedData, setHasFetchedData] = useState(false);
   const [hasFetchedMyClubs, setHasFetchedMyClubs] = useState(false);
-  const [hasRecruitments, setHasRecruitments] = useState(true); // 🔧 모집공고 존재 여부
+  const [hasRecruitments, setHasRecruitments] = useState(true);
 
   const { isLoggedIn, isMyClub, fetchMyClubs, myClubs } = useAuth();
   
-  // 동아리 이미지 로딩을 위한 훅 (club이 로드된 후에 사용)
+  // 동아리 이미지 로딩을 위한 훅
   const { imageUrl, loading: imageLoading, error: imageError } = useClubImage(club?.profileImageName);
+
+  // 🔧 동아리 타입 검증
+  const isCentral = clubType === 'central';
+  const isDepartment = clubType === 'department';
+  const isValidClubType = isCentral || isDepartment;
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -37,13 +42,12 @@ const CentralClubDetail = () => {
 
   // 편집 페이지로 이동
   const handleEditClick = () => {
-    navigate(`/club/central/${clubId}/edit`);
+    navigate(`/club/${clubType}/${clubId}/edit`);
   };
 
   // 🔧 동아리 정보를 먼저 모집공고로 시도하고, 실패하면 동아리 API로 fallback
   const fetchClubAndRecruitmentData = useCallback(async () => {
-    if (hasFetchedData) {
-      console.log(`⏭️ 이미 데이터를 가져왔음, 스킵`);
+    if (hasFetchedData || !isValidClubType) {
       return;
     }
 
@@ -52,17 +56,17 @@ const CentralClubDetail = () => {
       setError(null);
       setHasFetchedData(true);
       
-      console.log(`🔍 동아리 모집공고 조회 시도: ${clubId}`);
+      console.log(`🔍 ${clubType} 동아리 모집공고 조회 시도: ${clubId}`);
       
       try {
         // 1단계: 모집공고 API로 동아리 정보 조회 시도
         const response = await recruitmentService.getClubRecruitments(clubId);
         const recruitmentData = response.data || response || [];
         
-        console.log('✅ 모집공고 데이터:', recruitmentData);
+        console.log(`✅ ${clubType} 동아리 모집공고 데이터:`, recruitmentData);
         
         if (recruitmentData.length > 0) {
-          // 모집공고가 있는 경우 - 기존 로직
+          // 모집공고가 있는 경우
           const clubData = recruitmentData[0].club;
           setClub(clubData);
           setRecruitments(recruitmentData);
@@ -72,15 +76,14 @@ const CentralClubDetail = () => {
           const activeRecruitment = recruitmentData.find(r => r.status === 'RECRUITING') || recruitmentData[0];
           setActiveRecruitment(activeRecruitment);
           
-          console.log('✅ 동아리 정보 (모집공고 포함):', clubData);
+          console.log(`✅ ${clubType} 동아리 정보 (모집공고 포함):`, clubData);
           console.log('✅ 활성 모집공고:', activeRecruitment);
         } else {
-          // 🔧 모집공고는 없지만 API 호출은 성공한 경우
           throw new Error('NO_RECRUITMENTS');
         }
       } catch (recruitmentError) {
         // 2단계: 모집공고 조회 실패 시 동아리 정보만 조회
-        console.log('📝 모집공고 조회 실패, 동아리 정보만 조회:', recruitmentError.message);
+        console.log(`📝 ${clubType} 동아리 모집공고 조회 실패, 동아리 정보만 조회:`, recruitmentError.message);
         
         const clubResponse = await clubService.getClubDetail(clubId);
         const clubData = clubResponse.data || clubResponse;
@@ -90,16 +93,16 @@ const CentralClubDetail = () => {
         setActiveRecruitment(null);
         setHasRecruitments(false);
         
-        console.log('✅ 동아리 정보 (모집공고 없음):', clubData);
+        console.log(`✅ ${clubType} 동아리 정보 (모집공고 없음):`, clubData);
       }
     } catch (err) {
-      console.error('❌ 동아리 정보 조회 실패:', err);
+      console.error(`❌ ${clubType} 동아리 정보 조회 실패:`, err);
       setError(err.message || '동아리 정보를 불러오는 중 오류가 발생했습니다.');
       setHasFetchedData(false);
     } finally {
       setLoading(false);
     }
-  }, [clubId, hasFetchedData]);
+  }, [clubType, clubId, hasFetchedData, isValidClubType]);
 
   // 내 동아리 정보 조회
   const fetchMyClubsOnce = useCallback(async () => {
@@ -108,7 +111,7 @@ const CentralClubDetail = () => {
     }
 
     try {
-      console.log('🏢 동아리 상세 페이지에서 내 동아리 정보 조회');
+      console.log(`🏢 ${clubType} 동아리 상세 페이지에서 내 동아리 정보 조회`);
       setHasFetchedMyClubs(true);
       
       await fetchMyClubs();
@@ -116,25 +119,25 @@ const CentralClubDetail = () => {
       console.warn('⚠️ 내 동아리 정보 조회 실패 (토큰 만료 가능성):', error.message);
       setHasFetchedMyClubs(false);
     }
-  }, [isLoggedIn, myClubs.length, fetchMyClubs, hasFetchedMyClubs]);
+  }, [clubType, isLoggedIn, myClubs.length, fetchMyClubs, hasFetchedMyClubs]);
 
   // 데이터 가져오기
   useEffect(() => {
-    if (!clubId) {
-      setError('동아리 ID가 없습니다.');
+    if (!clubId || !isValidClubType) {
+      setError(!clubId ? '동아리 ID가 없습니다.' : '잘못된 동아리 타입입니다.');
       setLoading(false);
       return;
     }
 
     fetchClubAndRecruitmentData();
-  }, [clubId, fetchClubAndRecruitmentData]);
+  }, [clubId, fetchClubAndRecruitmentData, isValidClubType]);
 
   // 내 동아리 정보 조회
   useEffect(() => {
     fetchMyClubsOnce();
   }, [fetchMyClubsOnce]);
 
-  // clubId 변경시 상태 리셋
+  // clubId 또는 clubType 변경시 상태 리셋
   useEffect(() => {
     setHasFetchedData(false);
     setClub(null);
@@ -142,7 +145,7 @@ const CentralClubDetail = () => {
     setActiveRecruitment(null);
     setError(null);
     setHasRecruitments(true);
-  }, [clubId]);
+  }, [clubId, clubType]);
 
   const handleGoBack = () => {
     navigate(-1);
@@ -150,6 +153,13 @@ const CentralClubDetail = () => {
 
   // 🔧 내가 관리하는 동아리인지 확인
   const canEdit = isLoggedIn && isMyClub(parseInt(clubId));
+
+  // 🔧 동아리 타입에 따른 표시 텍스트
+  const getClubTypeText = () => {
+    if (isCentral) return '중앙동아리';
+    if (isDepartment) return '학과동아리';
+    return club?.type || '';
+  };
 
   // 로딩 상태
   if (loading) {
@@ -176,7 +186,7 @@ const CentralClubDetail = () => {
   }
 
   // 에러 상태
-  if (error || !club) {
+  if (error || !club || !isValidClubType) {
     return (
       <div className="min-h-screen flex flex-col bg-white-50">
         <div className="relative z-10">
@@ -247,7 +257,7 @@ const CentralClubDetail = () => {
                   className="text-base mb-1"
                   style={{ color: colors.darkGray }}
                 >
-                  {club.type === 'CENTRAL' ? '중앙동아리' : club.department || club.type}
+                  {getClubTypeText()}
                 </CustomText>
                 <CustomText 
                   font="pretendard-500"
@@ -257,7 +267,7 @@ const CentralClubDetail = () => {
                   {club.category}
                 </CustomText>
                 
-                {/* 🔧 활성 모집공고가 있으면 모집 상태 표시, 없으면 표시 안함 */}
+                {/* 활성 모집공고가 있으면 모집 상태 표시 */}
                 {hasRecruitments && activeRecruitment && (
                   <div className="my-2">
                     <div 
@@ -303,11 +313,11 @@ const CentralClubDetail = () => {
                 {activeTab === 'intro' ? '동아리 정보' : '모집 요강'}
               </CustomText>
               
-              {/* 🔧 탭에 따른 정보 보드 표시 */}
+              {/* 탭에 따른 정보 보드 표시 */}
               {activeTab === 'intro' ? (
                 <ClubInfoBoard club={club} style="introduce" />
               ) : (
-                // 🔧 모집공고가 없는 경우 처리
+                // 모집공고가 없는 경우 처리
                 hasRecruitments ? (
                   <RecruitmentInfoBoard recruitment={activeRecruitment} />
                 ) : (
@@ -323,7 +333,7 @@ const CentralClubDetail = () => {
                 )
               )}
               
-              {/* 🔧 내용 표시 (동아리 소개 또는 모집 상세 정보) */}
+              {/* 내용 표시 (동아리 소개 또는 모집 상세 정보) */}
               {activeTab === 'intro' ? (
                 // 동아리 소개
                 club.description ? (
@@ -343,7 +353,7 @@ const CentralClubDetail = () => {
                     </div>
                   </div>
                 ) : (
-                  // 🔧 동아리 소개가 없는 경우
+                  // 동아리 소개가 없는 경우
                   <div className="mt-6">
                     <CustomText 
                       font="pretendard-700"
@@ -392,7 +402,7 @@ const CentralClubDetail = () => {
                     </div>
                   </div>
                 ) : (
-                  // 🔧 모집공고가 없는 경우
+                  // 모집공고가 없는 경우
                   <div className="mt-6">
                     <CustomText 
                       font="pretendard-700"
@@ -418,7 +428,7 @@ const CentralClubDetail = () => {
         </div>
       </main>
       
-      {/* 🔧 조건부 플로팅 편집 버튼 - 내가 관리하는 동아리인 경우에만 표시 */}
+      {/* 조건부 플로팅 편집 버튼 - 내가 관리하는 동아리인 경우에만 표시 */}
       {canEdit && (
         <button 
           onClick={handleEditClick}
@@ -455,4 +465,4 @@ const CentralClubDetail = () => {
   );
 };
 
-export default CentralClubDetail;
+export default ClubDetail;

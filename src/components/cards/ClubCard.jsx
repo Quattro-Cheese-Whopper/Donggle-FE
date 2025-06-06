@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import CustomText from '../../utils/CustomText';
 import colors from '../../constants/colors';
 import { useClubImage } from '../../hooks/useClubImage';
@@ -33,7 +33,18 @@ const getRecruitmentBadgeInfo = (latestRecruitmentStatus) => {
 
 const ClubCard = ({ id, profileImageName, name, description, category, latestRecruitmentStatus, isRecruiting }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { imageUrl, loading, error } = useClubImage(profileImageName);
+
+  // 🔧 현재 경로를 기반으로 동아리 타입 결정
+  const getClubType = () => {
+    if (location.pathname.includes('/club/central') || location.pathname.includes('/home')) {
+      return 'central';
+    } else if (location.pathname.includes('/club/department')) {
+      return 'department';
+    }
+    return 'central'; // 기본값
+  };
 
   // 🔧 latestRecruitmentStatus 우선, fallback으로 isRecruiting 사용
   const recruitmentStatus = latestRecruitmentStatus !== undefined ? latestRecruitmentStatus : (isRecruiting ? 'RECRUITING' : 'COMPLETED');
@@ -41,7 +52,8 @@ const ClubCard = ({ id, profileImageName, name, description, category, latestRec
 
   // 카드 클릭 핸들러
   const handleCardClick = () => {
-    navigate(`/club/central/${id}`);
+    const clubType = getClubType();
+    navigate(`/club/${clubType}/${id}`);
   };
 
   // 이미지 렌더링
