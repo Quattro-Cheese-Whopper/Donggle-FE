@@ -1,4 +1,4 @@
-// src/api/services/authService.js - 디버깅 강화 버전
+// src/api/services/authService.js - 수정된 버전
 import { apiClient } from '../client';
 import { tokenManager } from '../../utils/tokenManager';
 
@@ -20,47 +20,16 @@ export const authService = {
     }
   },
 
-  // 회원가입
+  // 🔧 회원가입 - apiClient 사용하도록 수정
   signup: async (userData) => {
-    console.log('🚀 authService.signup 시작');
-    console.log('📤 전송할 데이터:', userData);
-    
     try {
-      console.log('📡 fetch 요청 시작...');
+      console.log('🚀 authService.signup 시작');
+      console.log('📤 전송할 데이터:', userData);
       
-      const response = await fetch('http://quattro-cheese.duckdns.org:8080/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(userData)
-      });
+      const response = await apiClient.post('/auth/signup', userData);
       
-      console.log('📥 응답 상태:', response.status, response.statusText);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ 에러 응답:', errorText);
-        throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
-      }
-      
-      // 🔧 빈 응답 처리
-      const responseText = await response.text();
-      console.log('📄 응답 본문:', responseText);
-      
-      if (!responseText || responseText.trim() === '') {
-        console.log('✅ 빈 응답 - 회원가입 성공');
-        return { success: true, message: '회원가입이 완료되었습니다.' };
-      }
-      
-      try {
-        const responseData = JSON.parse(responseText);
-        console.log('✅ JSON 응답:', responseData);
-        return responseData;
-      } catch (jsonError) {
-        console.log('⚠️ JSON 파싱 실패하지만 성공으로 처리');
-        return { success: true, message: '회원가입이 완료되었습니다.' };
-      }
+      console.log('✅ 회원가입 성공:', response);
+      return response || { success: true, message: '회원가입이 완료되었습니다.' };
       
     } catch (error) {
       console.error('💥 authService.signup 에러:', error);

@@ -131,8 +131,6 @@ class ApiClient {
         console.error('❌ 토큰 리프레시 실패:', refreshError);
         // 리프레시 실패 시 토큰 정리하고 로그인으로 리다이렉트
         tokenManager.clearTokens();
-        console.log('➡️ 토큰 리프레시 실패로 로그인 페이지로 리다이렉트');
-        window.location.href = '/signin';
         throw refreshError;
       }
     }
