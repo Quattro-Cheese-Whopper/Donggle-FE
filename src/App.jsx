@@ -10,6 +10,8 @@ import CentralClub from "./pages/club/CentralClub";
 import CentralClubDetail from "./pages/club/CentralClubDetail";
 import CentralClubEdit from "./pages/club/CentralClubEdit"; // 새로 추가
 import DepartmentClub from "./pages/club/DepartmentClub";
+import DepartmentClubDetail from "./pages/club/DepartmentClubDetail";
+import DepartmentClubEdit from "./pages/club/DepartmentClubEdit";
 import SignIn from "./pages/sign/signin";
 import SignUp from "./pages/sign/signup";
 import ChatButton from "./components/chat/ChatButton";
@@ -58,9 +60,16 @@ function AppInner() {
         <Route
           path="/club/central/:clubId/edit"
           element={<CentralClubEdit />}
-        />{" "}
-        {/* 편집 라우트 추가 */}
+        />
         <Route path="/club/department" element={<DepartmentClub />} />
+        <Route
+          path="/club/department/:clubId"
+          element={<DepartmentClubDetail />}
+        />
+        <Route
+          path="/club/department/:clubId/edit"
+          element={<DepartmentClubEdit />}
+        />
       </Routes>
       <ChatButton onClick={handleOpen} />
       <ChatWindow
