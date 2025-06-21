@@ -3,9 +3,18 @@ import CustomText from "../../utils/CustomText";
 import colors from "../../constants/colors";
 
 // 개별 공지사항 항목
-const NoticeItem = ({ title, date }) => {
+const NoticeItem = ({ id, title, date, onClick }) => {
+  const handleClick = () => {
+    if (onClick && id) {
+      onClick(id);
+    }
+  };
+
   return (
-    <li className="flex justify-between py-1.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors duration-200 cursor-pointer">
+    <li
+      className="flex justify-between py-1.5 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+      onClick={handleClick}
+    >
       <div className="flex items-start flex-1 min-w-0">
         <span className="w-1 h-1 bg-gray-400 rounded-full mr-2 mt-2.5 flex-shrink-0"></span>
         <CustomText
@@ -98,7 +107,7 @@ const EmptyNoticeState = ({ type }) => {
 };
 
 // 공지사항 보드
-const NoticeBoard = ({ title, notices, moreLink, type }) => {
+const NoticeBoard = ({ title, notices, moreLink, type, onNoticeClick }) => {
   const hasNotices = notices && notices.length > 0;
 
   return (
@@ -143,7 +152,13 @@ const NoticeBoard = ({ title, notices, moreLink, type }) => {
       {hasNotices ? (
         <ul className="space-y-0.5">
           {notices.slice(0, 5).map((notice, index) => (
-            <NoticeItem key={index} title={notice.title} date={notice.date} />
+            <NoticeItem
+              key={index}
+              id={notice.id}
+              title={notice.title}
+              date={notice.date}
+              onClick={onNoticeClick}
+            />
           ))}
         </ul>
       ) : (
@@ -153,7 +168,7 @@ const NoticeBoard = ({ title, notices, moreLink, type }) => {
   );
 };
 
-const NoticeGrid = ({ leftNotice, rightNotice }) => {
+const NoticeGrid = ({ leftNotice, rightNotice, onNoticeClick }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
       <NoticeBoard
@@ -161,6 +176,7 @@ const NoticeGrid = ({ leftNotice, rightNotice }) => {
         notices={leftNotice.items}
         moreLink={leftNotice.moreLink}
         type="general"
+        onNoticeClick={onNoticeClick}
       />
 
       <NoticeBoard
@@ -168,6 +184,7 @@ const NoticeGrid = ({ leftNotice, rightNotice }) => {
         notices={rightNotice.items}
         moreLink={rightNotice.moreLink}
         type="club"
+        onNoticeClick={onNoticeClick}
       />
     </div>
   );

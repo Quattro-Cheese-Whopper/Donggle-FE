@@ -204,6 +204,7 @@ const ClubDetail = ({ clubType = "central" }) => {
     }
 
     return notices.map((notice) => ({
+      id: notice.id,
       title: notice.title || "제목 없음",
       date: notice.createdAt
         ? new Date(notice.createdAt)
@@ -215,6 +216,11 @@ const ClubDetail = ({ clubType = "central" }) => {
             .replace(/\./g, ".")
         : "날짜 없음",
     }));
+  };
+
+  // 공지사항 클릭 핸들러
+  const handleNoticeClick = (announceId) => {
+    navigate(`/announces/${announceId}`);
   };
 
   // 로딩 상태
@@ -574,12 +580,75 @@ const ClubDetail = ({ clubType = "central" }) => {
                       </div>
                     </div>
                   ) : (
-                    <NoticeBoard
-                      title="동아리 공지사항"
-                      notices={formatNoticesForDisplay(notices)}
-                      moreLink="#"
-                      type="club"
-                    />
+                    <>
+                      {/* 공지사항 목록 */}
+                      <NoticeBoard
+                        title="동아리 공지사항"
+                        notices={formatNoticesForDisplay(notices)}
+                        moreLink={`/announces?type=CLUB&clubId=${clubId}`}
+                        type="club"
+                        onNoticeClick={handleNoticeClick}
+                      />
+
+                      {/* 최근 공지사항 상세 섹션 */}
+                      {notices && notices.length > 0 && (
+                        <div className="mt-8">
+                          <CustomText
+                            font="pretendard-700"
+                            className="text-lg mb-4"
+                            style={{ color: colors.black }}
+                          >
+                            최근 공지사항
+                          </CustomText>
+                          <div className="bg-white rounded-lg border border-gray-200 p-6">
+                            <div className="mb-4">
+                              <CustomText
+                                font="pretendard-600"
+                                className="text-xl mb-2"
+                                style={{ color: colors.black }}
+                              >
+                                {notices[0].title}
+                              </CustomText>
+                              <div className="flex items-center text-sm text-gray-500 mb-3">
+                                <span className="mr-4">
+                                  작성자:{" "}
+                                  {notices[0].authorName || "알 수 없음"}
+                                </span>
+                                <span>
+                                  {notices[0].createdAt
+                                    ? new Date(notices[0].createdAt)
+                                        .toLocaleDateString("ko-KR", {
+                                          year: "numeric",
+                                          month: "2-digit",
+                                          day: "2-digit",
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })
+                                        .replace(/\./g, ".")
+                                    : "날짜 없음"}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="prose prose-lg max-w-none leading-relaxed">
+                              {notices[0].content ? (
+                                <S3HtmlRenderer
+                                  htmlContent={notices[0].content}
+                                  className="prose prose-lg max-w-none leading-relaxed"
+                                />
+                              ) : (
+                                <CustomText
+                                  font="pretendard-400"
+                                  className="text-base"
+                                  style={{ color: colors.darkGray }}
+                                >
+                                  공지사항 내용이 없습니다.
+                                </CustomText>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}

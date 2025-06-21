@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TopNavigator from "../../utils/navigate/TopNavigator";
 import Footer from "../../utils/footer/BottomFooter";
 import JnuImage from "../../assets/전남대 풍경.png";
@@ -11,6 +12,7 @@ import CustomText from "../../utils/CustomText";
 import colors from "../../constants/colors";
 
 const Home = () => {
+  const navigate = useNavigate();
   const [clubs, setClubs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,6 +22,11 @@ const Home = () => {
   const [clubNotices, setClubNotices] = useState([]);
   const [noticesLoading, setNoticesLoading] = useState(true);
   const [noticesError, setNoticesError] = useState(null);
+
+  // 공지사항 클릭 핸들러
+  const handleNoticeClick = (announceId) => {
+    navigate(`/announces/${announceId}`);
+  };
 
   // 중앙동아리 데이터 가져오기
   useEffect(() => {
@@ -96,6 +103,7 @@ const Home = () => {
     }
 
     return notices.map((notice) => ({
+      id: notice.id,
       title: notice.title || "제목 없음",
       date: notice.createdAt
         ? new Date(notice.createdAt)
@@ -111,13 +119,13 @@ const Home = () => {
 
   const leftNotice = {
     title: "총동연 공지사항",
-    moreLink: "#",
+    moreLink: "/announces?type=GENERAL",
     items: formatNoticesForDisplay(generalNotices),
   };
 
   const rightNotice = {
     title: "동아리 공지사항",
-    moreLink: "#",
+    moreLink: "/announces?type=CLUB",
     items: formatNoticesForDisplay(clubNotices),
   };
 
@@ -196,7 +204,13 @@ const Home = () => {
 
     // 에러가 없으면 항상 NoticeGrid를 렌더링
     // 각 보드에서 개별적으로 빈 상태를 처리
-    return <NoticeGrid leftNotice={leftNotice} rightNotice={rightNotice} />;
+    return (
+      <NoticeGrid
+        leftNotice={leftNotice}
+        rightNotice={rightNotice}
+        onNoticeClick={handleNoticeClick}
+      />
+    );
   };
 
   return (

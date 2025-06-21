@@ -14,6 +14,8 @@ import DepartmentClubDetail from "./pages/club/DepartmentClubDetail";
 import DepartmentClubEdit from "./pages/club/DepartmentClubEdit";
 import SignIn from "./pages/sign/signin";
 import SignUp from "./pages/sign/signup";
+import AnnounceList from "./pages/AnnounceList";
+import AnnounceDetail from "./pages/AnnounceDetail";
 import ChatButton from "./components/chat/ChatButton";
 import ChatWindow from "./components/chat/ChatWindow";
 import useChat from "./hooks/useChat";
@@ -70,6 +72,8 @@ function AppInner() {
           path="/club/department/:clubId/edit"
           element={<DepartmentClubEdit />}
         />
+        <Route path="/announces" element={<AnnounceList />} />
+        <Route path="/announces/:announceId" element={<AnnounceDetail />} />
       </Routes>
       <ChatButton onClick={handleOpen} />
       <ChatWindow

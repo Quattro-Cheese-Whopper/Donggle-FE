@@ -33,6 +33,58 @@ export const announceService = {
     }
   },
 
+  // 타입별 공지사항 목록 조회 (페이지네이션 지원)
+  getAnnouncesByType: async (type, pageable = { page: 0, size: 10 }) => {
+    try {
+      console.log(`📢 ${type} 타입 공지사항 목록 조회 시작:`, pageable);
+
+      const params = new URLSearchParams({
+        page: pageable.page || 0,
+        size: pageable.size || 10,
+      });
+
+      if (pageable.sort) {
+        pageable.sort.forEach((sort) => params.append("sort", sort));
+      }
+
+      const response = await apiClient.get(`/announces/type/${type}?${params}`);
+
+      console.log(`✅ ${type} 타입 공지사항 목록 조회 성공:`, response);
+
+      return response;
+    } catch (error) {
+      console.error(`❌ ${type} 타입 공지사항 목록 조회 실패:`, error);
+      throw error;
+    }
+  },
+
+  // 동아리별 공지사항 목록 조회 (페이지네이션 지원)
+  getAnnouncesByClub: async (clubId, pageable = { page: 0, size: 10 }) => {
+    try {
+      console.log(`📢 동아리 ${clubId} 공지사항 목록 조회 시작:`, pageable);
+
+      const params = new URLSearchParams({
+        page: pageable.page || 0,
+        size: pageable.size || 10,
+      });
+
+      if (pageable.sort) {
+        pageable.sort.forEach((sort) => params.append("sort", sort));
+      }
+
+      const response = await apiClient.get(
+        `/announces/clubs/${clubId}?${params}`
+      );
+
+      console.log(`✅ 동아리 ${clubId} 공지사항 목록 조회 성공:`, response);
+
+      return response;
+    } catch (error) {
+      console.error(`❌ 동아리 ${clubId} 공지사항 목록 조회 실패:`, error);
+      throw error;
+    }
+  },
+
   // 공지사항 상세 조회
   getAnnounce: async (announceId) => {
     try {
