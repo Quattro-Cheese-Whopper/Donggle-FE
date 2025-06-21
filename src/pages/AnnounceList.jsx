@@ -293,7 +293,7 @@ const AnnounceList = () => {
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
-                    일반 공지사항
+                    총동연 공지사항
                   </button>
                   <button
                     onClick={() => handleTypeChange("CLUB")}

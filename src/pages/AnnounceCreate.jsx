@@ -118,7 +118,7 @@ const AnnounceCreate = () => {
         // 일반 공지사항 작성: ADMIN 권한 확인
         hasPermission = isAdmin();
         if (!hasPermission) {
-          setError("일반 공지사항을 작성할 권한이 없습니다.");
+          setError("총동연 공지사항을 작성할 권한이 없습니다.");
         } else {
           setError(null); // 권한이 있으면 에러 제거
         }
@@ -220,7 +220,7 @@ const AnnounceCreate = () => {
             >
               {clubId
                 ? "해당 동아리의 공지사항을 작성할 권한이 없습니다"
-                : "일반 공지사항을 작성할 권한이 없습니다"}
+                : "총동연 공지사항을 작성할 권한이 없습니다"}
             </CustomText>
             <button
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -251,7 +251,7 @@ const AnnounceCreate = () => {
                 className="text-2xl mb-2"
                 style={{ color: colors.black }}
               >
-                {clubId ? "동아리 공지사항 작성" : "일반 공지사항 작성"}
+                {clubId ? "동아리 공지사항 작성" : "총동연 공지사항 작성"}
               </CustomText>
               <CustomText
                 font="pretendard-500"
@@ -262,7 +262,7 @@ const AnnounceCreate = () => {
                   ? `새로운 동아리 공지사항을 작성합니다${
                       club ? ` (${club.name})` : ""
                     }`
-                  : "새로운 일반 공지사항을 작성합니다"}
+                  : "새로운 총동연 공지사항을 작성합니다"}
               </CustomText>
             </div>
           </div>
