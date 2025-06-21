@@ -19,7 +19,15 @@ const AnnounceDetail = () => {
   const [error, setError] = useState(null);
 
   // 인증 훅
-  const { isLoggedIn, isMyClub, fetchMyClubs, myClubs } = useAuth();
+  const {
+    isLoggedIn,
+    isMyClub,
+    isAdmin,
+    fetchMyClubs,
+    fetchCurrentUser,
+    myClubs,
+    user,
+  } = useAuth();
 
   // 동아리 이미지 훅
   const {
@@ -112,9 +120,35 @@ const AnnounceDetail = () => {
     }
   }, [announce, club, isLoggedIn, myClubs.length, fetchMyClubs]);
 
-  // 🔧 내가 관리하는 동아리인지 확인 (동아리 공지사항인 경우만)
+  // 내 사용자 정보 조회
+  useEffect(() => {
+    if (isLoggedIn && !user) {
+      fetchCurrentUser();
+    }
+  }, [isLoggedIn, user, fetchCurrentUser]);
+
+  // 🔧 내가 관리하는 동아리인지 확인 (동아리 공지사항인 경우) 또는 ADMIN 권한 (일반 공지사항인 경우)
   const canEdit =
-    isLoggedIn && announce?.type === "CLUB" && club && isMyClub(club.id);
+    isLoggedIn &&
+    ((announce?.type === "CLUB" &&
+      club &&
+      myClubs.length > 0 &&
+      isMyClub(club.id)) ||
+      (announce?.type === "GENERAL" && user && isAdmin()));
+
+  // 디버깅을 위한 콘솔 로그
+  useEffect(() => {
+    if (announce && isLoggedIn) {
+      console.log("🔍 AnnounceDetail 권한 확인:", {
+        announceType: announce.type,
+        club: club,
+        myClubsLength: myClubs.length,
+        user: user,
+        isLoggedIn: isLoggedIn,
+        canEdit: canEdit,
+      });
+    }
+  }, [announce, club, myClubs.length, user, isLoggedIn, canEdit]);
 
   // 데이터 조회
   useEffect(() => {

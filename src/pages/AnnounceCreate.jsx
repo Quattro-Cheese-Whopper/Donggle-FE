@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import TopNavigator from "../utils/navigate/TopNavigator";
 import Footer from "../utils/footer/BottomFooter";
 import CustomText from "../utils/CustomText";
@@ -7,37 +7,30 @@ import colors from "../constants/colors";
 import WYSIWYGEditor from "../components/editor/WYSIWYGEditor";
 import { announceService } from "../api/services/announceService";
 import { clubService } from "../api/services/clubService";
-import { useClubImage } from "../hooks/useClubImage";
 import { useAuth } from "../hooks/useAuth";
 
-const AnnounceEdit = () => {
-  const { announceId } = useParams();
+const AnnounceCreate = () => {
   const navigate = useNavigate();
-  const [announce, setAnnounce] = useState(null);
-  const [club, setClub] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [club, setClub] = useState(null);
 
-  // 인증 훅
+  // 인증 훅 - 동아리 관리자 권한 확인을 위해 필요한 함수들 추가
   const {
     isLoggedIn,
-    isMyClub,
     isAdmin,
+    isMyClub,
     fetchMyClubs,
     fetchCurrentUser,
     myClubs,
     user,
   } = useAuth();
 
-  // 동아리 이미지 훅
-  const {
-    imageUrl,
-    loading: imageLoading,
-    error: imageError,
-  } = useClubImage(club?.profileImageName);
+  // URL 파라미터에서 clubId 가져오기
+  const clubId = searchParams.get("clubId");
 
-  // 편집 가능한 공지사항 필드들의 상태
+  // 공지사항 작성 폼 데이터
   const [noticeFormData, setNoticeFormData] = useState({
     title: "",
     content: "",
@@ -59,59 +52,31 @@ const AnnounceEdit = () => {
     getProcessedContentRef.current = getProcessedContentFn;
   };
 
-  // 공지사항 상세 조회
-  const fetchAnnounceDetail = async () => {
-    if (!announceId) {
-      setError("공지사항 ID가 없습니다.");
-      setLoading(false);
-      return;
-    }
+  // 🔧 동아리 정보 조회 (동아리별 공지사항 작성인 경우)
+  const fetchClubInfo = async () => {
+    if (!clubId) return;
 
     try {
-      setLoading(true);
-      setError(null);
+      console.log(`🏢 동아리 ${clubId} 정보 조회 시작`);
+      const response = await clubService.getClubDetail(clubId);
+      const clubData = response.data || response;
+      console.log(`✅ 동아리 ${clubId} 정보 조회 성공:`, clubData);
+      setClub(clubData);
+    } catch (error) {
+      console.error(`❌ 동아리 ${clubId} 정보 조회 실패:`, error);
+      setError("동아리 정보를 불러올 수 없습니다.");
+    }
+  };
 
-      console.log(`📢 편집용 공지사항 ${announceId} 상세 조회 시작`);
-
-      const response = await announceService.getAnnounce(announceId);
-      const announceData = response.data || response;
-
-      console.log(
-        `✅ 편집용 공지사항 ${announceId} 상세 조회 성공:`,
-        announceData
-      );
-
-      setAnnounce(announceData);
-
-      // 폼 데이터 설정
-      setNoticeFormData({
-        title: announceData.title || "",
-        content: announceData.content || "",
-        pinned: announceData.pinned || false,
-      });
-
-      // 동아리 공지사항인 경우 동아리 정보도 조회
-      if (announceData.type === "CLUB" && announceData.clubId) {
-        try {
-          console.log(`🏢 편집용 동아리 ${announceData.clubId} 정보 조회 시작`);
-          const clubResponse = await clubService.getClubDetail(
-            announceData.clubId
-          );
-          const clubData = clubResponse.data || clubResponse;
-          console.log(
-            `✅ 편집용 동아리 ${announceData.clubId} 정보 조회 성공:`,
-            clubData
-          );
-          setClub(clubData);
-        } catch (clubError) {
-          console.warn(`⚠️ 편집용 동아리 정보 조회 실패:`, clubError);
-        }
+  // 🔧 내 동아리 정보 조회 (동아리별 공지사항 작성인 경우)
+  const fetchMyClubsOnce = async () => {
+    if (clubId && isLoggedIn && myClubs.length === 0) {
+      try {
+        console.log("🏢 공지사항 작성에서 내 동아리 정보 조회");
+        await fetchMyClubs();
+      } catch (error) {
+        console.warn("⚠️ 내 동아리 정보 조회 실패:", error.message);
       }
-    } catch (err) {
-      console.error(`❌ 편집용 공지사항 ${announceId} 상세 조회 실패:`, err);
-      setError(err.message || "공지사항을 불러오는 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -122,78 +87,44 @@ const AnnounceEdit = () => {
     }
   }, [isLoggedIn, user, fetchCurrentUser]);
 
-  // 내 동아리 정보 조회 (동아리 공지사항인 경우)
+  // 🔧 동아리 정보 조회 (동아리별 공지사항 작성인 경우)
   useEffect(() => {
-    if (
-      announce?.type === "CLUB" &&
-      club &&
-      isLoggedIn &&
-      myClubs.length === 0
-    ) {
-      console.log("🏢 공지사항 편집에서 내 동아리 정보 조회");
-      fetchMyClubs();
-    }
-  }, [announce, club, isLoggedIn, myClubs.length, fetchMyClubs]);
+    fetchClubInfo();
+  }, [clubId]);
 
-  // 권한 확인 (개선된 버전)
+  // 🔧 내 동아리 정보 조회 (동아리별 공지사항 작성인 경우)
   useEffect(() => {
-    if (announce && isLoggedIn) {
-      let canEdit = false;
-      let shouldCheck = false;
+    fetchMyClubsOnce();
+  }, [clubId, isLoggedIn, myClubs.length, fetchMyClubs]);
 
-      console.log("🔍 권한 확인 시작:", {
-        announceType: announce.type,
-        club: club,
-        myClubsLength: myClubs.length,
-        user: user,
-        isLoggedIn: isLoggedIn,
-      });
+  // 🔧 권한 확인 (일반 공지사항: ADMIN 권한, 동아리 공지사항: 해당 동아리 관리자 권한)
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      let hasPermission = false;
 
-      if (announce.type === "CLUB") {
-        // 동아리 공지사항: 동아리 정보와 내 동아리 정보가 모두 로드된 후에만 확인
-        if (club && myClubs.length > 0) {
-          canEdit = isMyClub(club.id);
-          shouldCheck = true;
-          console.log("🏢 동아리 공지사항 권한 확인:", {
-            clubId: club.id,
-            myClubIds: myClubs.map((c) => c.id),
-            canEdit: canEdit,
-          });
-        } else {
-          console.log("⏳ 동아리 정보 로딩 대기 중:", {
-            hasClub: !!club,
-            myClubsLength: myClubs.length,
-          });
+      if (clubId) {
+        // 동아리별 공지사항 작성: 해당 동아리 관리자 권한 확인
+        // 🔧 내 동아리 정보가 로딩 중이거나 로드된 후에만 권한 확인
+        if (myClubs.length > 0) {
+          hasPermission = isMyClub(parseInt(clubId));
+          if (!hasPermission) {
+            setError("해당 동아리의 공지사항을 작성할 권한이 없습니다.");
+          } else {
+            setError(null); // 권한이 있으면 에러 제거
+          }
         }
-      } else if (announce.type === "GENERAL") {
-        // 일반 공지사항: 사용자 정보가 로드된 후에만 확인
-        if (user) {
-          canEdit = isAdmin();
-          shouldCheck = true;
-          console.log("👤 일반 공지사항 권한 확인:", {
-            userRole: user.role,
-            canEdit: canEdit,
-          });
+        // myClubs.length === 0인 경우는 아직 로딩 중이므로 권한 확인 보류
+      } else {
+        // 일반 공지사항 작성: ADMIN 권한 확인
+        hasPermission = isAdmin();
+        if (!hasPermission) {
+          setError("일반 공지사항을 작성할 권한이 없습니다.");
         } else {
-          console.log("⏳ 사용자 정보 로딩 대기 중");
+          setError(null); // 권한이 있으면 에러 제거
         }
       }
-
-      // 권한 확인이 필요한 경우에만 에러 설정
-      if (shouldCheck && !canEdit) {
-        console.log("❌ 편집 권한 없음");
-        setError("이 공지사항을 편집할 권한이 없습니다.");
-      } else if (shouldCheck && canEdit) {
-        console.log("✅ 편집 권한 있음");
-        setError(null); // 기존 에러 제거
-      }
     }
-  }, [announce, club, isLoggedIn, myClubs, user, isMyClub, isAdmin]);
-
-  // 데이터 조회
-  useEffect(() => {
-    fetchAnnounceDetail();
-  }, [announceId]);
+  }, [isLoggedIn, user, clubId, myClubs.length, isMyClub, isAdmin]);
 
   const handleSave = async () => {
     if (!noticeFormData.title.trim()) {
@@ -210,8 +141,6 @@ const AnnounceEdit = () => {
     setError(null);
 
     try {
-      console.log("💾 공지사항 수정 시작:", noticeFormData);
-
       // WYSIWYG 에디터에서 처리된 콘텐츠 가져오기 (Base64 이미지 → S3 변환)
       let processedContent = noticeFormData.content;
 
@@ -230,51 +159,53 @@ const AnnounceEdit = () => {
 
       console.log("📤 서버로 전송할 공지사항 데이터:", requestData);
 
-      // API 호출로 공지사항 수정
-      await announceService.updateAnnounce(announceId, requestData);
+      let response;
 
-      console.log("✅ 공지사항 수정 성공");
+      if (clubId) {
+        // 🔧 동아리별 공지사항 생성
+        console.log(`💾 동아리 ${clubId} 공지사항 생성 시작:`, requestData);
+        response = await announceService.createClubAnnounce(
+          clubId,
+          requestData
+        );
+        console.log(`✅ 동아리 ${clubId} 공지사항 생성 성공:`, response);
 
-      // 성공 후 상세 페이지로 돌아가기
-      navigate(`/announces/${announceId}`);
+        // 성공 후 동아리별 공지사항 목록 페이지로 이동
+        navigate(`/announces?type=CLUB&clubId=${clubId}`);
+      } else {
+        // 일반 공지사항 생성
+        console.log("💾 일반 공지사항 생성 시작:", requestData);
+        response = await announceService.createGeneralAnnounce(requestData);
+        console.log("✅ 일반 공지사항 생성 성공:", response);
+
+        // 성공 후 일반 공지사항 목록 페이지로 이동
+        navigate("/announces?type=GENERAL");
+      }
     } catch (error) {
-      console.error("❌ 공지사항 수정 실패:", error);
-      setError("공지사항 수정에 실패했습니다. 다시 시도해주세요.");
+      console.error("❌ 공지사항 생성 실패:", error);
+      setError("공지사항 작성에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancel = () => {
-    navigate(`/announces/${announceId}`);
+    if (clubId) {
+      // 동아리별 공지사항 작성 취소 시 동아리별 목록으로 이동
+      navigate(`/announces?type=CLUB&clubId=${clubId}`);
+    } else {
+      // 일반 공지사항 작성 취소 시 일반 목록으로 이동
+      navigate("/announces?type=GENERAL");
+    }
   };
 
-  // 로딩 상태
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col bg-white-50">
-        <div className="relative z-10">
-          <TopNavigator />
-        </div>
-        <main className="flex-grow flex justify-center items-center">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <CustomText
-              font="pretendard-600"
-              className="text-lg"
-              style={{ color: colors.darkGray }}
-            >
-              공지사항을 불러오는 중...
-            </CustomText>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    );
-  }
-
-  // 에러 상태
-  if (error || !announce) {
+  // 🔧 권한이 없는 경우
+  if (
+    isLoggedIn &&
+    user &&
+    ((clubId && myClubs.length > 0 && !isMyClub(parseInt(clubId))) ||
+      (!clubId && !isAdmin()))
+  ) {
     return (
       <div className="min-h-screen flex flex-col bg-white-50">
         <div className="relative z-10">
@@ -287,11 +218,13 @@ const AnnounceEdit = () => {
               className="text-lg mb-4"
               style={{ color: colors.black }}
             >
-              {error || "공지사항을 찾을 수 없습니다"}
+              {clubId
+                ? "해당 동아리의 공지사항을 작성할 권한이 없습니다"
+                : "일반 공지사항을 작성할 권한이 없습니다"}
             </CustomText>
             <button
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              onClick={() => navigate("/announces")}
+              onClick={handleCancel}
             >
               목록으로 돌아가기
             </button>
@@ -312,52 +245,24 @@ const AnnounceEdit = () => {
       <div className="w-full bg-white border-b">
         <div className="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
-            {club && (
-              <div className="mr-6">
-                {/* 동아리 이미지 렌더링 */}
-                {imageLoading ? (
-                  <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <div className="w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                  </div>
-                ) : imageError || !imageUrl ? (
-                  <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
-                    <svg
-                      className="w-8 h-8 text-gray-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                      />
-                    </svg>
-                  </div>
-                ) : (
-                  <img
-                    src={imageUrl}
-                    alt={`${club.name} 로고`}
-                    className="w-20 h-20 object-cover rounded-lg"
-                  />
-                )}
-              </div>
-            )}
             <div>
               <CustomText
                 font="pretendard-700"
                 className="text-2xl mb-2"
                 style={{ color: colors.black }}
               >
-                공지사항 편집
+                {clubId ? "동아리 공지사항 작성" : "일반 공지사항 작성"}
               </CustomText>
               <CustomText
                 font="pretendard-500"
                 className="text-base"
                 style={{ color: colors.darkGray }}
               >
-                {announce.title} 수정
+                {clubId
+                  ? `새로운 동아리 공지사항을 작성합니다${
+                      club ? ` (${club.name})` : ""
+                    }`
+                  : "새로운 일반 공지사항을 작성합니다"}
               </CustomText>
             </div>
           </div>
@@ -375,7 +280,7 @@ const AnnounceEdit = () => {
                   className="text-lg mb-4"
                   style={{ color: colors.black }}
                 >
-                  공지사항 수정
+                  공지사항 작성
                 </CustomText>
 
                 {/* 제목 입력 */}
@@ -421,7 +326,6 @@ const AnnounceEdit = () => {
                       handleInputChange("content", content)
                     }
                     placeholder="공지사항 내용을 작성해주세요..."
-                    clubId={club?.id}
                     onGetProcessedContent={handleGetProcessedContent}
                   />
                 </div>
@@ -459,7 +363,7 @@ const AnnounceEdit = () => {
                         저장 중...
                       </>
                     ) : (
-                      "수정 완료"
+                      "작성 완료"
                     )}
                   </button>
                 </div>
@@ -474,4 +378,4 @@ const AnnounceEdit = () => {
   );
 };
 
-export default AnnounceEdit;
+export default AnnounceCreate;

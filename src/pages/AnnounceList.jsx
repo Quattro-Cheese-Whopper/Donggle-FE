@@ -5,6 +5,7 @@ import Footer from "../utils/footer/BottomFooter";
 import CustomText from "../utils/CustomText";
 import colors from "../constants/colors";
 import { announceService } from "../api/services/announceService";
+import { useAuth } from "../hooks/useAuth";
 import S3HtmlRenderer from "../components/editor/S3HtmlRenderer";
 
 const AnnounceList = () => {
@@ -18,9 +19,32 @@ const AnnounceList = () => {
   const [pageSize] = useState(10);
   const navigate = useNavigate();
 
+  // 인증 훅 - 동아리 관리자 권한 확인을 위해 필요한 함수들 추가
+  const {
+    isLoggedIn,
+    isAdmin,
+    isMyClub,
+    fetchMyClubs,
+    fetchCurrentUser,
+    myClubs,
+    user,
+  } = useAuth();
+
   // URL 파라미터에서 타입과 동아리 ID 가져오기 (기본값: GENERAL)
   const type = searchParams.get("type") || "GENERAL";
   const clubId = searchParams.get("clubId");
+
+  // 🔧 내 동아리 정보 조회 (동아리별 공지사항 조회인 경우)
+  const fetchMyClubsOnce = useCallback(async () => {
+    if (clubId && type === "CLUB" && isLoggedIn && myClubs.length === 0) {
+      try {
+        console.log("🏢 동아리 공지사항 목록에서 내 동아리 정보 조회");
+        await fetchMyClubs();
+      } catch (error) {
+        console.warn("⚠️ 내 동아리 정보 조회 실패:", error.message);
+      }
+    }
+  }, [clubId, type, isLoggedIn, myClubs.length, fetchMyClubs]);
 
   // 공지사항 목록 조회
   const fetchAnnounces = useCallback(async () => {
@@ -89,6 +113,29 @@ const AnnounceList = () => {
     navigate(`/announces/${announceId}`);
   };
 
+  // 공지사항 작성 페이지로 이동
+  const handleCreateAnnounce = () => {
+    if (clubId && type === "CLUB") {
+      // 동아리별 공지사항 작성 페이지로 이동
+      navigate(`/announces/create?clubId=${clubId}`);
+    } else {
+      // 일반 공지사항 작성 페이지로 이동
+      navigate("/announces/create");
+    }
+  };
+
+  // 내 사용자 정보 조회
+  useEffect(() => {
+    if (isLoggedIn && !user) {
+      fetchCurrentUser();
+    }
+  }, [isLoggedIn, user, fetchCurrentUser]);
+
+  // 🔧 내 동아리 정보 조회 (동아리별 공지사항 조회인 경우)
+  useEffect(() => {
+    fetchMyClubsOnce();
+  }, [fetchMyClubsOnce]);
+
   // 데이터 조회
   useEffect(() => {
     fetchAnnounces();
@@ -98,6 +145,14 @@ const AnnounceList = () => {
   useEffect(() => {
     setCurrentPage(0);
   }, [type]);
+
+  // 🔧 동아리 관리자 권한 확인 (동아리별 공지사항 조회인 경우)
+  const canCreateClubAnnounce =
+    clubId &&
+    type === "CLUB" &&
+    isLoggedIn &&
+    myClubs.length > 0 &&
+    isMyClub(parseInt(clubId));
 
   // 페이지네이션 컴포넌트
   const Pagination = () => {
@@ -192,13 +247,40 @@ const AnnounceList = () => {
           <div className="px-4">
             {/* 헤더 */}
             <div className="mb-8">
-              <CustomText
-                font="pretendard-700"
-                className="text-3xl mb-4"
-                style={{ color: colors.black }}
-              >
-                {clubId && type === "CLUB" ? "동아리 공지사항" : "공지사항"}
-              </CustomText>
+              <div className="flex items-center justify-between mb-4">
+                <CustomText
+                  font="pretendard-700"
+                  className="text-3xl"
+                  style={{ color: colors.black }}
+                >
+                  {clubId && type === "CLUB" ? "동아리 공지사항" : "공지사항"}
+                </CustomText>
+
+                {/* 🔧 관리자 권한일 때 공지사항 작성 버튼 */}
+                {/* 일반 공지사항: ADMIN 권한 */}
+                {/* 동아리 공지사항: 해당 동아리 관리자 권한 */}
+                {(isAdmin() && type === "GENERAL") || canCreateClubAnnounce ? (
+                  <button
+                    onClick={handleCreateAnnounce}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+                  >
+                    <svg
+                      className="w-4 h-4 mr-2"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
+                    공지사항 작성
+                  </button>
+                ) : null}
+              </div>
 
               {/* 타입 필터 - 동아리별 조회가 아닐 때만 표시 */}
               {!clubId && (
