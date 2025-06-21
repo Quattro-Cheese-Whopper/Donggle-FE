@@ -5,14 +5,24 @@ import Footer from "../utils/footer/BottomFooter";
 import CustomText from "../utils/CustomText";
 import colors from "../constants/colors";
 import { announceService } from "../api/services/announceService";
+import { clubService } from "../api/services/clubService";
+import { useClubImage } from "../hooks/useClubImage";
 import S3HtmlRenderer from "../components/editor/S3HtmlRenderer";
 
 const AnnounceDetail = () => {
   const { announceId } = useParams();
   const navigate = useNavigate();
   const [announce, setAnnounce] = useState(null);
+  const [club, setClub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // 동아리 이미지 훅
+  const {
+    imageUrl,
+    loading: imageLoading,
+    error: imageError,
+  } = useClubImage(club?.profileImageName);
 
   // 공지사항 상세 조회
   const fetchAnnounceDetail = async () => {
@@ -34,6 +44,25 @@ const AnnounceDetail = () => {
       console.log(`✅ 공지사항 ${announceId} 상세 조회 성공:`, announceData);
 
       setAnnounce(announceData);
+
+      // 동아리 공지사항인 경우 동아리 정보도 조회
+      if (announceData.type === "CLUB" && announceData.clubId) {
+        try {
+          console.log(`🏢 동아리 ${announceData.clubId} 정보 조회 시작`);
+          const clubResponse = await clubService.getClubDetail(
+            announceData.clubId
+          );
+          const clubData = clubResponse.data || clubResponse;
+          console.log(
+            `✅ 동아리 ${announceData.clubId} 정보 조회 성공:`,
+            clubData
+          );
+          setClub(clubData);
+        } catch (clubError) {
+          console.warn(`⚠️ 동아리 정보 조회 실패:`, clubError);
+          // 동아리 정보 조회 실패는 전체 에러로 처리하지 않음
+        }
+      }
     } catch (err) {
       console.error(`❌ 공지사항 ${announceId} 상세 조회 실패:`, err);
       setError(err.message || "공지사항을 불러오는 중 오류가 발생했습니다.");
@@ -53,10 +82,110 @@ const AnnounceDetail = () => {
     navigate(`/announces?type=${type}`);
   };
 
+  // 동아리 상세 페이지로 이동
+  const handleClubClick = () => {
+    if (club) {
+      const clubType = club.type === "CENTRAL" ? "central" : "department";
+      navigate(`/club/${clubType}/${club.id}`);
+    }
+  };
+
   // 데이터 조회
   useEffect(() => {
     fetchAnnounceDetail();
   }, [announceId]);
+
+  // 동아리 프로필 카드 컴포넌트
+  const ClubProfileCard = () => {
+    if (!club || announce?.type !== "CLUB") return null;
+
+    return (
+      <div
+        className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+        onClick={handleClubClick}
+      >
+        <div className="flex items-center space-x-4">
+          {/* 좌측: 이미지와 동아리명 */}
+          <div className="flex-shrink-0">
+            {imageLoading ? (
+              <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                <div className="w-4 h-4 border-4 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : imageError || !imageUrl ? (
+              <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
+                <svg
+                  className="w-8 h-8 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                  />
+                </svg>
+              </div>
+            ) : (
+              <img
+                src={imageUrl}
+                alt={`${club.name} 로고`}
+                className="w-16 h-16 object-cover rounded-lg"
+              />
+            )}
+          </div>
+
+          {/* 우측: 동아리 정보와 상세보기 */}
+          <div className="flex-1 min-w-0">
+            <CustomText
+              font="pretendard-600"
+              className="text-base mb-1 truncate"
+              style={{ color: colors.black }}
+            >
+              {club.name}
+            </CustomText>
+            <CustomText
+              font="pretendard-500"
+              className="text-sm mb-1"
+              style={{ color: colors.darkGray }}
+            >
+              {club.type === "CENTRAL"
+                ? "중앙동아리"
+                : club.department || club.type}
+            </CustomText>
+            <CustomText
+              font="pretendard-500"
+              className="text-sm mb-2"
+              style={{ color: colors.darkGray }}
+            >
+              {club.category}
+            </CustomText>
+
+            {/* 동아리 상세보기 버튼 */}
+            <div className="flex items-center text-blue-600 hover:text-blue-800 transition-colors">
+              <span className="text-xs font-medium mr-1">동아리 상세보기</span>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M9 6L15 12L9 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // 로딩 상태
   if (loading) {
@@ -225,51 +354,64 @@ const AnnounceDetail = () => {
                 </div>
               </div>
 
-              <CustomText
-                font="pretendard-700"
-                className="text-3xl mb-4"
-                style={{ color: colors.black }}
-              >
-                {announce.title}
-              </CustomText>
-
-              <div className="flex items-center text-sm text-gray-500 space-x-6 mb-6">
-                <span>작성자: {announce.authorName || "알 수 없음"}</span>
-                {announce.clubName && <span>동아리: {announce.clubName}</span>}
-                <span>
-                  작성일:{" "}
-                  {announce.createdAt
-                    ? new Date(announce.createdAt)
-                        .toLocaleDateString("ko-KR", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                        .replace(/\./g, ".")
-                    : "날짜 없음"}
-                </span>
-                {announce.updatedAt &&
-                  announce.updatedAt !== announce.createdAt && (
+              <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-8">
+                {/* 좌측: 제목 및 메타데이터 */}
+                <div className="flex-1">
+                  <CustomText
+                    font="pretendard-700"
+                    className="text-3xl mb-4"
+                    style={{ color: colors.black }}
+                  >
+                    {announce.title}
+                  </CustomText>
+                  <div className="flex flex-wrap items-center text-sm text-gray-500 gap-x-6 gap-y-2">
+                    <span>작성자: {announce.authorName || "알 수 없음"}</span>
+                    {announce.clubName && (
+                      <span>동아리: {announce.clubName}</span>
+                    )}
                     <span>
-                      수정일:{" "}
-                      {new Date(announce.updatedAt)
-                        .toLocaleDateString("ko-KR", {
-                          year: "numeric",
-                          month: "2-digit",
-                          day: "2-digit",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
-                        .replace(/\./g, ".")}
+                      작성일:{" "}
+                      {announce.createdAt
+                        ? new Date(announce.createdAt)
+                            .toLocaleDateString("ko-KR", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                            .replace(/\./g, ".")
+                        : "날짜 없음"}
                     </span>
-                  )}
+                    {announce.updatedAt &&
+                      announce.updatedAt !== announce.createdAt && (
+                        <span>
+                          수정일:{" "}
+                          {new Date(announce.updatedAt)
+                            .toLocaleDateString("ko-KR", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                            .replace(/\./g, ".")}
+                        </span>
+                      )}
+                  </div>
+                </div>
+
+                {/* 우측: 동아리 프로필 카드 */}
+                {announce.type === "CLUB" && (
+                  <div className="lg:w-80 flex-shrink-0 w-full">
+                    <ClubProfileCard />
+                  </div>
+                )}
               </div>
             </div>
 
             {/* 공지사항 내용 */}
-            <div className="bg-white rounded-lg border border-gray-200 p-8">
+            <div className="bg-white rounded-lg border border-gray-200 p-8 mt-8">
               {announce.content ? (
                 <div className="prose prose-lg max-w-none leading-relaxed">
                   <S3HtmlRenderer
