@@ -16,6 +16,7 @@ import SignIn from "./pages/sign/signin";
 import SignUp from "./pages/sign/signup";
 import AnnounceList from "./pages/AnnounceList";
 import AnnounceDetail from "./pages/AnnounceDetail";
+import AnnounceEdit from "./pages/AnnounceEdit";
 import ChatButton from "./components/chat/ChatButton";
 import ChatWindow from "./components/chat/ChatWindow";
 import useChat from "./hooks/useChat";
@@ -74,6 +75,7 @@ function AppInner() {
         />
         <Route path="/announces" element={<AnnounceList />} />
         <Route path="/announces/:announceId" element={<AnnounceDetail />} />
+        <Route path="/announces/:announceId/edit" element={<AnnounceEdit />} />
       </Routes>
       <ChatButton onClick={handleOpen} />
       <ChatWindow

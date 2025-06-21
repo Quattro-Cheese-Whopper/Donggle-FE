@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import TopNavigator from "../../utils/navigate/TopNavigator";
 import Footer from "../../utils/footer/BottomFooter";
 import CustomText from "../../utils/CustomText";
@@ -18,6 +18,7 @@ import { announceService } from "../../api/services/announceService";
 const ClubDetail = ({ clubType = "central" }) => {
   const { clubId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [club, setClub] = useState(null);
   const [activeRecruitment, setActiveRecruitment] = useState(null);
   const [notices, setNotices] = useState([]);
@@ -142,7 +143,7 @@ const ClubDetail = ({ clubType = "central" }) => {
     } finally {
       setLoading(false);
     }
-  }, [clubId, hasFetchedData]);
+  }, [clubId, hasFetchedData, location.pathname]);
 
   // 내 동아리 정보 조회
   const fetchMyClubsOnce = useCallback(async () => {
@@ -189,6 +190,15 @@ const ClubDetail = ({ clubType = "central" }) => {
     setError(null);
     setHasRecruitments(true);
   }, [clubId]);
+
+  // 🔧 편집 페이지에서 돌아왔을 때 데이터 새로 가져오기
+  useEffect(() => {
+    // 편집 페이지에서 돌아왔는지 확인 (URL에 /edit이 없고, 이전에 데이터를 가져온 상태)
+    if (hasFetchedData && !location.pathname.includes("/edit")) {
+      console.log("🔄 편집 후 돌아옴 - 데이터 새로 가져오기");
+      setHasFetchedData(false);
+    }
+  }, [location.pathname, hasFetchedData]);
 
   const handleGoBack = () => {
     navigate(-1);
@@ -600,7 +610,10 @@ const ClubDetail = ({ clubType = "central" }) => {
                           >
                             최근 공지사항
                           </CustomText>
-                          <div className="bg-white rounded-lg border border-gray-200 p-6">
+                          <div
+                            className="bg-white rounded-lg border border-gray-200 p-6 cursor-pointer hover:shadow-md transition-all duration-200"
+                            onClick={() => handleNoticeClick(notices[0].id)}
+                          >
                             <div className="mb-4">
                               <CustomText
                                 font="pretendard-600"

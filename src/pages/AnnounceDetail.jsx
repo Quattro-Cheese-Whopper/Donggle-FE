@@ -7,6 +7,7 @@ import colors from "../constants/colors";
 import { announceService } from "../api/services/announceService";
 import { clubService } from "../api/services/clubService";
 import { useClubImage } from "../hooks/useClubImage";
+import { useAuth } from "../hooks/useAuth";
 import S3HtmlRenderer from "../components/editor/S3HtmlRenderer";
 
 const AnnounceDetail = () => {
@@ -16,6 +17,9 @@ const AnnounceDetail = () => {
   const [club, setClub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // 인증 훅
+  const { isLoggedIn, isMyClub, fetchMyClubs, myClubs } = useAuth();
 
   // 동아리 이미지 훅
   const {
@@ -89,6 +93,28 @@ const AnnounceDetail = () => {
       navigate(`/club/${clubType}/${club.id}`);
     }
   };
+
+  // 편집 페이지로 이동
+  const handleEditClick = () => {
+    navigate(`/announces/${announceId}/edit`);
+  };
+
+  // 내 동아리 정보 조회 (동아리 공지사항인 경우)
+  useEffect(() => {
+    if (
+      announce?.type === "CLUB" &&
+      club &&
+      isLoggedIn &&
+      myClubs.length === 0
+    ) {
+      console.log("🏢 공지사항 상세에서 내 동아리 정보 조회");
+      fetchMyClubs();
+    }
+  }, [announce, club, isLoggedIn, myClubs.length, fetchMyClubs]);
+
+  // 🔧 내가 관리하는 동아리인지 확인 (동아리 공지사항인 경우만)
+  const canEdit =
+    isLoggedIn && announce?.type === "CLUB" && club && isMyClub(club.id);
 
   // 데이터 조회
   useEffect(() => {
@@ -539,6 +565,38 @@ const AnnounceDetail = () => {
           </div>
         </div>
       </main>
+
+      {/* 🔧 조건부 플로팅 편집 버튼 - 동아리 관리자인 경우에만 표시 */}
+      {canEdit && (
+        <button
+          onClick={handleEditClick}
+          className="fixed bottom-16 w-14 h-14 bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800 hover:shadow-xl transition-all duration-200 z-50 flex items-center justify-center group"
+          style={{
+            right: `max(24px, calc((100vw - 896px) / 2 + 24px))`,
+          }}
+          title="공지사항 편집"
+        >
+          <svg
+            className="w-6 h-6 transform group-hover:scale-110 transition-transform duration-200"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+            />
+          </svg>
+
+          {/* 호버시 나타나는 툴팁 */}
+          <div className="absolute bottom-16 right-0 bg-gray-800 text-white text-sm px-3 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+            편집하기
+            <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+          </div>
+        </button>
+      )}
 
       <Footer />
     </div>
