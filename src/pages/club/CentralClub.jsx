@@ -1,19 +1,20 @@
-import React, { useState } from 'react';
-import TopNavigator from '../../utils/navigate/TopNavigator';
-import Footer from '../../utils/footer/BottomFooter';
-import { ClubCardGrid } from '../../components/cards/ClubCard';
-import CardFilter from '../../components/cards/CardFilter';
-import CustomText from '../../utils/CustomText';
-import colors from '../../constants/colors';
-import { useClubs } from '../../hooks/useClubs';
+import React, { useState } from "react";
+import TopNavigator from "../../utils/navigate/TopNavigator";
+import Footer from "../../utils/footer/BottomFooter";
+import { ClubCardGrid } from "../../components/cards/ClubCard";
+import CardFilter from "../../components/cards/CardFilter";
+import CustomText from "../../utils/CustomText";
+import colors from "../../constants/colors";
+import { useClubs } from "../../hooks/useClubs";
 
 const CentralClub = () => {
-  const [selectedCategory, setSelectedCategory] = useState('전체');
-  const { clubs, categories, error, getFilteredClubs, filterByCategory } = useClubs('CENTRAL');
+  const [selectedCategory, setSelectedCategory] = useState("전체");
+  const { clubs, categories, error, getFilteredClubs, filterByCategory } =
+    useClubs("CENTRAL");
 
   const filteredClubs = getFilteredClubs(selectedCategory);
   // 카테고리 선택 핸들러
-  const handleCategorySelect = async (category) => {  
+  const handleCategorySelect = async (category) => {
     setSelectedCategory(category);
     await filterByCategory(category);
   };
@@ -24,16 +25,13 @@ const CentralClub = () => {
         <TopNavigator />
         <main className="flex-grow flex items-center justify-center">
           <div className="text-center">
-            <CustomText 
+            <CustomText
               font="pretendard-600"
               className="text-lg text-red-500 mb-4"
             >
               데이터를 불러오는 중 오류가 발생했습니다.
             </CustomText>
-            <CustomText 
-              font="pretendard-400"
-              className="text-sm text-gray-600"
-            >
+            <CustomText font="pretendard-400" className="text-sm text-gray-600">
               {error}
             </CustomText>
           </div>
@@ -51,19 +49,19 @@ const CentralClub = () => {
       <main className="flex-grow flex justify-center">
         <div className="max-w-7xl w-full pt-6 pb-24 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            <CardFilter 
+            <CardFilter
               categories={categories}
               selectedCategory={selectedCategory}
               onCategorySelect={handleCategorySelect}
             />
-            <CustomText 
-                font="pretendard-600"
-                className="text-lg mb-4"
-                style={{ color: colors.black }}
+            <CustomText
+              font="pretendard-600"
+              className="text-lg mb-4"
+              style={{ color: colors.black }}
             >
-                중앙 동아리 목록
+              중앙 동아리 목록
             </CustomText>
-            <ClubCardGrid clubs={filteredClubs} />
+            <ClubCardGrid clubs={filteredClubs} clubType="central" />
           </div>
         </div>
       </main>

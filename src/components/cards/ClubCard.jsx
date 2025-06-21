@@ -1,47 +1,65 @@
-import React from 'react';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import CustomText from '../../utils/CustomText';
-import colors from '../../constants/colors';
-import { useClubImage } from '../../hooks/useClubImage';
+import React from "react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import CustomText from "../../utils/CustomText";
+import colors from "../../constants/colors";
+import { useClubImage } from "../../hooks/useClubImage";
 
 // 🔧 모집 상태에 따른 배지 정보를 반환하는 헬퍼 함수
 const getRecruitmentBadgeInfo = (latestRecruitmentStatus) => {
   switch (latestRecruitmentStatus) {
-    case 'RECRUITING':
+    case "RECRUITING":
       return {
-        text: '모집중',
+        text: "모집중",
         bgColor: colors.primary,
-        textColor: colors.white
+        textColor: colors.white,
       };
-    case 'ALWAYS_RECRUITING':
+    case "ALWAYS_RECRUITING":
       return {
-        text: '상시모집',
+        text: "상시모집",
         bgColor: colors.lightBlue,
-        textColor: colors.white
+        textColor: colors.white,
       };
     case null:
-    case 'COMPLETED':
+    case "COMPLETED":
     default:
       return {
-        text: '모집종료',
+        text: "모집종료",
         bgColor: colors.lightGray,
-        textColor: colors.mediumGray
+        textColor: colors.mediumGray,
       };
   }
 };
 
-const ClubCard = ({ id, profileImageName, name, description, category, latestRecruitmentStatus, isRecruiting }) => {
+const ClubCard = ({
+  id,
+  profileImageName,
+  name,
+  description,
+  category,
+  latestRecruitmentStatus,
+  isRecruiting,
+  clubType = "central",
+}) => {
   const navigate = useNavigate();
   const { imageUrl, loading, error } = useClubImage(profileImageName);
 
   // 🔧 latestRecruitmentStatus 우선, fallback으로 isRecruiting 사용
-  const recruitmentStatus = latestRecruitmentStatus !== undefined ? latestRecruitmentStatus : (isRecruiting ? 'RECRUITING' : 'COMPLETED');
+  const recruitmentStatus =
+    latestRecruitmentStatus !== undefined
+      ? latestRecruitmentStatus
+      : isRecruiting
+      ? "RECRUITING"
+      : "COMPLETED";
   const badgeInfo = getRecruitmentBadgeInfo(recruitmentStatus);
 
-  // 카드 클릭 핸들러
+  // 카드 클릭 핸들러 - 동아리 타입에 따라 적절한 경로로 라우팅
   const handleCardClick = () => {
-    navigate(`/club/central/${id}`);
+    const path =
+      clubType === "department"
+        ? `/club/department/${id}`
+        : `/club/central/${id}`;
+    navigate(path);
   };
 
   // 이미지 렌더링
@@ -57,64 +75,72 @@ const ClubCard = ({ id, profileImageName, name, description, category, latestRec
     if (error || !imageUrl) {
       return (
         <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-          <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          <svg
+            className="w-6 h-6 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+            />
           </svg>
         </div>
       );
     }
 
     return (
-      <img 
-        src={imageUrl} 
-        alt={`${name} 프로필`} 
+      <img
+        src={imageUrl}
+        alt={`${name} 프로필`}
         className="w-12 h-12 object-cover rounded-lg"
       />
     );
   };
 
   return (
-    <div 
+    <div
       className="bg-white rounded-lg shadow-sm p-5 flex flex-col h-44 relative border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
       onClick={handleCardClick}
     >
       {/* 동아리 프로필 이미지 */}
-      <div className="mb-3">
-        {renderImage()}
-      </div>
-      
+      <div className="mb-3">{renderImage()}</div>
+
       {/* 동아리 이름 */}
-      <CustomText 
+      <CustomText
         font="pretendard-600"
         className="text-lg mb-2"
         style={{ color: colors.black }}
       >
         {name}
       </CustomText>
-      
+
       {/* 분과 및 카테고리 정보 */}
       <div className="text-sm flex-grow">
-        <CustomText 
-          font="pretendard-400" 
+        <CustomText
+          font="pretendard-400"
           style={{ color: colors.darkGray }}
           className="block mb-1"
         >
           {category}
         </CustomText>
       </div>
-      
+
       {/* 🔧 latestRecruitmentStatus 기반 모집 상태 배지 */}
       <div className="absolute bottom-4 right-4">
-        <div 
+        <div
           className="px-3 py-1 rounded-lg inline-block"
-          style={{ 
+          style={{
             backgroundColor: badgeInfo.bgColor,
           }}
         >
-          <CustomText 
+          <CustomText
             font="pretendard-400"
             className="text-xs"
-            style={{ 
+            style={{
               color: badgeInfo.textColor,
               margin: 0,
             }}
@@ -127,7 +153,7 @@ const ClubCard = ({ id, profileImageName, name, description, category, latestRec
   );
 };
 
-const ClubCardGrid = ({ clubs }) => {
+const ClubCardGrid = ({ clubs, clubType = "central" }) => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {clubs.map((club) => (
@@ -140,27 +166,29 @@ const ClubCardGrid = ({ clubs }) => {
           category={club.category}
           latestRecruitmentStatus={club.latestRecruitmentStatus}
           isRecruiting={club.isRecruiting} // 🔧 fallback용으로 유지
+          clubType={clubType}
         />
       ))}
     </div>
   );
 };
 
-const HorizontalClubCarousel = ({ clubs }) => {
+const HorizontalClubCarousel = ({ clubs, clubType = "central" }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const itemsPerPage = 3;
   const totalItems = clubs.length;
-  
+
   // 이전 페이지로 이동
   const goToPrevious = () => {
     if (currentIndex === 0) {
-      const lastPageStartIndex = Math.floor((totalItems - 1) / itemsPerPage) * itemsPerPage;
+      const lastPageStartIndex =
+        Math.floor((totalItems - 1) / itemsPerPage) * itemsPerPage;
       setCurrentIndex(lastPageStartIndex);
     } else {
       setCurrentIndex(currentIndex - itemsPerPage);
     }
   };
-  
+
   // 다음 페이지로 이동
   const goToNext = () => {
     if (currentIndex + itemsPerPage >= totalItems) {
@@ -169,23 +197,35 @@ const HorizontalClubCarousel = ({ clubs }) => {
       setCurrentIndex(currentIndex + itemsPerPage);
     }
   };
-  
+
   // 현재 화면에 표시할 동아리
   const visibleClubs = clubs.slice(currentIndex, currentIndex + itemsPerPage);
-  
+
   return (
     <div className="relative w-full">
       {/* 좌측 화살표 */}
-      <button 
+      <button
         onClick={goToPrevious}
         className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-4 z-10 bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-md border border-gray-100 focus:outline-none hover:bg-gray-50"
         aria-label="이전 동아리 보기"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M15 18L9 12L15 6" stroke={colors.darkGray} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M15 18L9 12L15 6"
+            stroke={colors.darkGray}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
-      
+
       {/* 동아리 카드 컨테이너 */}
       <div className="flex justify-between space-x-4 px-8">
         {visibleClubs.map((club) => (
@@ -198,24 +238,38 @@ const HorizontalClubCarousel = ({ clubs }) => {
               category={club.category}
               latestRecruitmentStatus={club.latestRecruitmentStatus}
               isRecruiting={club.isRecruiting} // 🔧 fallback용으로 유지
+              clubType={clubType}
             />
           </div>
         ))}
-        
+
         {/* 부족한 카드 공간 채우기 */}
-        {visibleClubs.length < itemsPerPage && Array.from({ length: itemsPerPage - visibleClubs.length }).map((_, i) => (
-          <div key={`empty-${i}`} className="flex-1 min-w-0"></div>
-        ))}
+        {visibleClubs.length < itemsPerPage &&
+          Array.from({ length: itemsPerPage - visibleClubs.length }).map(
+            (_, i) => <div key={`empty-${i}`} className="flex-1 min-w-0"></div>
+          )}
       </div>
-      
+
       {/* 우측 화살표 */}
-      <button 
+      <button
         onClick={goToNext}
         className="absolute right-0 top-1/2 transform -translate-y-1/2 translate-x-4 z-10 bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-md border border-gray-100 focus:outline-none hover:bg-gray-50"
         aria-label="다음 동아리 보기"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M9 6L15 12L9 18" stroke={colors.darkGray} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M9 6L15 12L9 18"
+            stroke={colors.darkGray}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </button>
     </div>
