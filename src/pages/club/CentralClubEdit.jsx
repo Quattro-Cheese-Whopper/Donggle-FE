@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import TopNavigator from "../../utils/navigate/TopNavigator";
 import Footer from "../../utils/footer/BottomFooter";
 import CustomText from "../../utils/CustomText";
@@ -15,12 +15,21 @@ import { useClubImage } from "../../hooks/useClubImage";
 const CentralClubEdit = ({ clubType = "central" }) => {
   const { clubId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [club, setClub] = useState(null);
   const [activeRecruitment, setActiveRecruitment] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("intro");
+
+  // 🔧 URL 쿼리 파라미터에서 이전 탭 정보를 읽어와서 초기 탭으로 설정
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("fromTab");
+    return tab && ["intro", "recruit", "notice"].includes(tab) ? tab : "intro";
+  };
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
   const [hasFetchedData, setHasFetchedData] = useState(false);
   const [hasRecruitments, setHasRecruitments] = useState(true); // 🔧 모집공고 존재 여부
 
@@ -267,12 +276,15 @@ const CentralClubEdit = ({ clubType = "central" }) => {
       await clubService.updateClub(clubId, updateData);
 
       console.log("✅ 동아리 정보 업데이트 성공");
+      alert("동아리 정보가 성공적으로 업데이트되었습니다.");
 
-      // 성공 후 상세 페이지로 돌아가기
-      navigate(getClubPath(`/${clubId}`));
-    } catch (error) {
-      console.error("❌ 동아리 정보 업데이트 실패:", error);
-      alert("저장에 실패했습니다. 다시 시도해주세요.");
+      // 🔧 상세 페이지로 돌아갈 때, 원래 탭 정보를 쿼리 파라미터로 전달
+      const fromTab = new URLSearchParams(location.search).get("fromTab");
+      navigate(getClubPath(`/${clubId}?tab=${fromTab || "intro"}`));
+    } catch (err) {
+      console.error("❌ 동아리 정보 업데이트 실패:", err);
+      setError(err.message || "동아리 정보 업데이트에 실패했습니다.");
+      alert("오류가 발생했습니다: " + err.message);
     } finally {
       setSaving(false);
     }
@@ -328,18 +340,25 @@ const CentralClubEdit = ({ clubType = "central" }) => {
         setActiveRecruitment(response.data || response);
       }
 
-      // 성공 후 상세 페이지로 돌아가기
-      navigate(getClubPath(`/${clubId}`));
-    } catch (error) {
-      console.error("❌ 모집공고 정보 저장 실패:", error);
-      alert("저장에 실패했습니다. 다시 시도해주세요.");
+      console.log("✅ 모집공고 업데이트 완료");
+      alert("모집공고가 성공적으로 업데이트되었습니다.");
+
+      // 🔧 상세 페이지로 돌아갈 때, 원래 탭 정보를 쿼리 파라미터로 전달
+      const fromTab = new URLSearchParams(location.search).get("fromTab");
+      navigate(getClubPath(`/${clubId}?tab=${fromTab || "recruit"}`));
+    } catch (err) {
+      console.error("❌ 모집공고 업데이트 실패:", err);
+      setError(err.message || "모집공고 업데이트에 실패했습니다.");
+      alert("오류가 발생했습니다: " + err.message);
     } finally {
       setSaving(false);
     }
   };
 
   const handleCancel = () => {
-    navigate(getClubPath(`/${clubId}`));
+    // 🔧 취소 시에도 원래 탭 정보를 가지고 상세 페이지로 돌아감
+    const fromTab = new URLSearchParams(location.search).get("fromTab");
+    navigate(getClubPath(`/${clubId}?tab=${fromTab || "intro"}`));
   };
 
   // 🔧 공지사항 생성 후 데이터 새로 가져오기

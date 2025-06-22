@@ -24,7 +24,15 @@ const ClubDetail = ({ clubType = "central" }) => {
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("intro");
+
+  // 🔧 URL 쿼리 파라미터에서 초기 탭을 가져오거나 'intro'로 기본 설정
+  const getInitialTab = () => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    return tab && ["intro", "recruit", "notice"].includes(tab) ? tab : "intro";
+  };
+  const [activeTab, setActiveTab] = useState(getInitialTab);
+
   const [hasFetchedData, setHasFetchedData] = useState(false);
   const [hasFetchedMyClubs, setHasFetchedMyClubs] = useState(false);
   const [hasRecruitments, setHasRecruitments] = useState(true);
@@ -39,14 +47,22 @@ const ClubDetail = ({ clubType = "central" }) => {
     error: imageError,
   } = useClubImage(club?.profileImageName);
 
+  // 🔧 탭 변경 시 URL도 함께 변경
   const handleTabChange = (tab) => {
     setActiveTab(tab);
+    // 현재 경로와 다른 쿼리 파라미터를 유지하면서 'tab' 파라미터만 업데이트
+    const searchParams = new URLSearchParams(location.search);
+    searchParams.set("tab", tab);
+    navigate(`${location.pathname}?${searchParams.toString()}`, {
+      replace: true,
+    });
   };
 
   // 편집 페이지로 이동 (동적 URL 생성)
+  // 🔧 수정 버튼 클릭 시 현재 활성화된 탭 정보를 쿼리 파라미터로 전달
   const handleEditClick = () => {
     const editPath = clubType === "central" ? "central" : "department";
-    navigate(`/club/${editPath}/${clubId}/edit`);
+    navigate(`/club/${editPath}/${clubId}/edit?fromTab=${activeTab}`);
   };
 
   // 공지사항 데이터 가져오기
@@ -80,6 +96,15 @@ const ClubDetail = ({ clubType = "central" }) => {
       fetchNotices();
     }
   }, [activeTab, clubId, fetchNotices]);
+
+  // 🔧 URL이 변경될 때 (예: 브라우저 뒤로/앞으로 가기) 탭 상태 동기화
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab && ["intro", "recruit", "notice"].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [location.search]);
 
   // 🔧 동아리 정보를 먼저 모집공고로 시도하고, 실패하면 동아리 API로 fallback
   const fetchClubAndRecruitmentData = useCallback(async () => {
