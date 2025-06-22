@@ -9,6 +9,7 @@ import { clubService } from "../api/services/clubService";
 import { useClubImage } from "../hooks/useClubImage";
 import { useAuth } from "../hooks/useAuth";
 import S3HtmlRenderer from "../components/editor/S3HtmlRenderer";
+import Toast from "../components/Toast";
 
 const AnnounceDetail = () => {
   const { announceId } = useParams();
@@ -17,6 +18,9 @@ const AnnounceDetail = () => {
   const [club, setClub] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [toast, setToast] = useState(null);
 
   // 인증 훅
   const {
@@ -107,6 +111,63 @@ const AnnounceDetail = () => {
     navigate(`/announces/${announceId}/edit`);
   };
 
+  // 삭제 확인 다이얼로그 표시
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  // 삭제 확인 다이얼로그 닫기
+  const handleDeleteCancel = () => {
+    setShowDeleteConfirm(false);
+  };
+
+  // 공지사항 삭제 실행
+  const handleDeleteConfirm = async () => {
+    if (!announceId) return;
+
+    setDeleting(true);
+    try {
+      console.log(`🗑️ 공지사항 ${announceId} 삭제 시작`);
+
+      await announceService.deleteAnnounce(announceId);
+
+      console.log(`✅ 공지사항 ${announceId} 삭제 성공`);
+
+      // 삭제 성공 토스트 표시
+      setToast({
+        message: "공지사항이 성공적으로 삭제되었습니다.",
+        type: "success",
+        duration: 2000,
+      });
+    } catch (error) {
+      console.error(`❌ 공지사항 ${announceId} 삭제 실패:`, error);
+
+      // 삭제 실패 토스트 표시
+      setToast({
+        message: "공지사항 삭제에 실패했습니다. 다시 시도해주세요.",
+        type: "error",
+        duration: 3000,
+      });
+    } finally {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  // 토스트 닫기 핸들러
+  const handleToastClose = () => {
+    setToast(null);
+    // 성공 토스트가 닫힌 후 목록 페이지로 이동
+    if (toast?.type === "success") {
+      const type = announce?.type || "GENERAL";
+      if (announce?.type === "CLUB" && announce?.clubId) {
+        navigate(`/announces?type=CLUB&clubId=${announce.clubId}`);
+      } else {
+        navigate(`/announces?type=${type}`);
+      }
+    }
+  };
+
   // 내 동아리 정보 조회 (동아리 공지사항인 경우)
   useEffect(() => {
     if (
@@ -136,6 +197,9 @@ const AnnounceDetail = () => {
       isMyClub(club.id)) ||
       (announce?.type === "GENERAL" && user && isAdmin()));
 
+  // 🔧 삭제 권한 확인 (편집 권한과 동일)
+  const canDelete = canEdit;
+
   // 디버깅을 위한 콘솔 로그
   useEffect(() => {
     if (announce && isLoggedIn) {
@@ -146,9 +210,10 @@ const AnnounceDetail = () => {
         user: user,
         isLoggedIn: isLoggedIn,
         canEdit: canEdit,
+        canDelete: canDelete,
       });
     }
-  }, [announce, club, myClubs.length, user, isLoggedIn, canEdit]);
+  }, [announce, club, myClubs.length, user, isLoggedIn, canEdit, canDelete]);
 
   // 데이터 조회
   useEffect(() => {
@@ -411,6 +476,79 @@ const AnnounceDetail = () => {
                   <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full">
                     {announce.type === "GENERAL" ? "일반" : "동아리"}
                   </span>
+                  {/* 편집/삭제 버튼 */}
+                  {canEdit && (
+                    <div className="flex items-center space-x-2 ml-4">
+                      <button
+                        onClick={handleEditClick}
+                        className="px-3 py-1 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors flex items-center"
+                      >
+                        <svg
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="mr-1"
+                        >
+                          <path
+                            d="M11 4H4C3.46957 4 2.96086 4.21071 2.58579 4.58579C2.21071 4.96086 2 5.46957 2 6V20C2 20.5304 2.21071 21.0391 2.58579 21.4142C2.96086 21.7893 3.46957 22 4 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V13"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M18.5 2.50023C18.8978 2.10297 19.4374 1.87891 20 1.87891C20.5626 1.87891 21.1022 2.10297 21.5 2.50023C21.8971 2.89792 22.1212 3.43767 22.1212 4.00023C22.1212 4.56279 21.8971 5.10254 21.5 5.50023L12 15.0002L8 16.0002L9 12.0002L18.5 2.50023Z"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        편집
+                      </button>
+                      <button
+                        onClick={handleDeleteClick}
+                        className="px-3 py-1 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition-colors flex items-center"
+                        disabled={deleting}
+                      >
+                        {deleting ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1"></div>
+                            삭제 중...
+                          </>
+                        ) : (
+                          <>
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="mr-1"
+                            >
+                              <path
+                                d="M3 6H5H21"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            삭제
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -630,6 +768,93 @@ const AnnounceDetail = () => {
             <div className="absolute top-full right-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
           </div>
         </button>
+      )}
+
+      {/* 🔧 삭제 확인 다이얼로그 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z"
+                    stroke="#EF4444"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+              <div>
+                <CustomText
+                  font="pretendard-700"
+                  className="text-lg"
+                  style={{ color: colors.black }}
+                >
+                  공지사항 삭제
+                </CustomText>
+                <CustomText
+                  font="pretendard-500"
+                  className="text-sm"
+                  style={{ color: colors.darkGray }}
+                >
+                  정말 삭제하시겠습니까?
+                </CustomText>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <CustomText
+                font="pretendard-500"
+                className="text-sm"
+                style={{ color: colors.darkGray }}
+              >
+                "{announce?.title}" 공지사항을 삭제하면 복구할 수 없습니다.
+              </CustomText>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleDeleteCancel}
+                className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={deleting}
+              >
+                취소
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center"
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    삭제 중...
+                  </>
+                ) : (
+                  "삭제"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🔧 토스트 알림 */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.duration}
+          onClose={handleToastClose}
+        />
       )}
 
       <Footer />
