@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://quattro-cheese.duckdns.org:8080',
+        target: 'https://quattro-cheese.duckdns.org',
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path
